@@ -31,7 +31,7 @@ body {
 button, input, select { font: inherit; }
 
 .app {
-  width: min(1320px, calc(100vw - 20px));
+  width: min(1180px, calc(100vw - 24px));
   margin: 0 auto;
   padding: 8px 0 32px;
 }
@@ -171,20 +171,20 @@ h2 { margin-bottom: 10px; }
 
 .year-scroll { overflow-x: auto; background: var(--card); border-width: 3px; }
 .year-table {
-  min-width: 1110px;
+  min-width: 980px;
   display: grid;
-  grid-template-columns: 128px repeat(31, minmax(28px, 1fr));
+  grid-template-columns: 112px repeat(31, minmax(25px, 1fr));
   gap: 2px;
   padding: 2px;
   background: var(--line);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
 }
 
 .year-cell {
-  min-height: 38px;
+  min-height: 34px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   background: white;
   display: grid;
   place-items: center;
@@ -199,7 +199,7 @@ h2 { margin-bottom: 10px; }
   z-index: 2;
   justify-items: start;
   padding-left: 8px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -209,7 +209,7 @@ h2 { margin-bottom: 10px; }
 .has-slot { background: var(--blue); font-weight: 900; cursor: pointer; }
 .has-winner { background: var(--green); }
 .has-holiday { background: var(--yellow); }
-.weekday-mini { font-size: 12px; font-weight: 700; }
+.weekday-mini { font-size: 11px; font-weight: 700; }
 .cell-label {
   width: 100%;
   margin-top: 2px;
@@ -220,6 +220,7 @@ h2 { margin-bottom: 10px; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 11px;
 }
 
 .grid.two {
@@ -260,10 +261,19 @@ h2 { margin-bottom: 10px; }
 .winner { color: #2f6f50; font-weight: 900; }
 
 .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: end; }
+.manual-winner {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border-top: 2px dashed rgba(47,53,66,.28);
+  padding-top: 8px;
+}
+.compact-input { min-height: 36px; }
 .section-title { margin-top: 20px; }
 .note { margin-top: 18px; border-radius: 18px; }
 
 @media (max-width: 920px) {
-  .tabs, .toolbar, .grid.two, .section-head { grid-template-columns: 1fr; }
+  .tabs, .toolbar, .grid.two, .section-head, .manual-winner { grid-template-columns: 1fr; }
   .brand-logo { max-height: 118px; }
 }
