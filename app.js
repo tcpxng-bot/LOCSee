@@ -61,6 +61,7 @@ const el = {
   passwordInput: document.querySelector("#passwordInput"),
   loginMessage: document.querySelector("#loginMessage"),
   statusText: document.querySelector("#statusText"),
+  logoutBtn: document.querySelector("#logoutBtn"),
   tabButtons: document.querySelectorAll(".tab"),
   panels: document.querySelectorAll(".panel"),
   search: document.querySelector("#search"),
@@ -72,6 +73,7 @@ const el = {
   directWinnerName: document.querySelector("#directWinnerName"),
   bookingForm: document.querySelector("#bookingForm"),
   bookingSlot: document.querySelector("#bookingSlot"),
+  bookingStart: document.querySelector("#bookingStart"),
   bookingName: document.querySelector("#bookingName"),
   openSlotList: document.querySelector("#openSlotList"),
   drawList: document.querySelector("#drawList"),
@@ -99,6 +101,7 @@ el.loginForm.addEventListener("submit", event => {
 
 el.tabButtons.forEach(button => button.addEventListener("click", () => setTab(button.dataset.tab)));
 el.search.addEventListener("input", render);
+el.logoutBtn.addEventListener("click", logoutApp);
 el.reloadBtn.addEventListener("click", loadData);
 el.fiscalYearSelect.addEventListener("change", () => {
   selectedFiscalYear = Number(el.fiscalYearSelect.value);
@@ -118,6 +121,15 @@ function unlockApp() {
   el.loginGate.classList.add("is-unlocked");
   el.appShell.classList.remove("is-locked");
   loadData();
+}
+
+function logoutApp() {
+  sessionStorage.removeItem(AUTH_KEY);
+  el.passwordInput.value = "";
+  el.loginMessage.textContent = "";
+  el.loginGate.classList.remove("is-unlocked");
+  el.appShell.classList.add("is-locked");
+  el.passwordInput.focus();
 }
 
 function setTab(name) {
@@ -154,11 +166,7 @@ async function createSlot(event) {
   event.preventDefault();
   const start = el.slotStart.value;
   if (!start) return;
-  if (!isMondayText(start)) {
-    alert("วันเริ่ม Loc ต้องเป็นวันจันทร์เท่านั้น เพราะ 1 Loc คือจันทร์-ศุกร์");
-    el.slotStart.focus();
-    return;
-  }
+  if (!validateMonday(start, el.slotStart)) return;
   const end = addBusinessDays(start, LOCK_DAYS);
   const directWinner = el.directWinnerName.value.trim();
   const item = {
@@ -168,24 +176,22 @@ async function createSlot(event) {
     winner_name: directWinner || null,
     status: directWinner ? "drawn" : "open"
   };
-  if (hasSupabase) {
-    const { error } = await db.from("loc_slots").insert(item);
-    if (error) return alert(error.message);
-  } else {
-    slots.push({ id: crypto.randomUUID(), created_at: new Date().toISOString(), ...item });
-    writeLocal(VAC_KEY, slots);
-  }
+  const saved = await saveSlot(item);
+  if (!saved) return;
   el.directWinnerName.value = "";
   await loadData();
 }
 
 async function createBooking(event) {
   event.preventDefault();
+  const personName = el.bookingName.value.trim();
+  if (!personName) return;
+  const slotId = await resolveBookingSlotId();
+  if (!slotId) return;
   const item = {
-    slot_id: el.bookingSlot.value,
-    person_name: el.bookingName.value.trim()
+    slot_id: slotId,
+    person_name: personName
   };
-  if (!item.slot_id || !item.person_name) return;
   if (hasSupabase) {
     const { error } = await db.from("loc_bookings").insert(item);
     if (error) return alert(error.message);
@@ -194,7 +200,45 @@ async function createBooking(event) {
     writeLocal(BOOKING_KEY, bookings);
   }
   el.bookingName.value = "";
+  el.bookingStart.value = "";
   await loadData();
+}
+
+async function resolveBookingSlotId() {
+  if (el.bookingSlot.value) return el.bookingSlot.value;
+  const start = el.bookingStart.value;
+  if (!start) {
+    alert("กรุณาเลือก Loc ที่เปิดไว้ หรือเลือกวันเริ่ม Loc ที่ต้องการจอง");
+    el.bookingStart.focus();
+    return "";
+  }
+  if (!validateMonday(start, el.bookingStart)) return "";
+  const end = addBusinessDays(start, LOCK_DAYS);
+  const existing = slots.find(slot => slot.start_date === start && slot.end_date === end && slot.status !== "drawn");
+  if (existing) return existing.id;
+  const saved = await saveSlot({
+    label: defaultSlotLabel(start, end),
+    start_date: start,
+    end_date: end,
+    winner_name: null,
+    status: "open"
+  });
+  return saved?.id || "";
+}
+
+async function saveSlot(item) {
+  if (hasSupabase) {
+    const { data, error } = await db.from("loc_slots").insert(item).select("id").single();
+    if (error) {
+      alert(error.message);
+      return null;
+    }
+    return { id: data.id, ...item };
+  }
+  const saved = { id: crypto.randomUUID(), created_at: new Date().toISOString(), ...item };
+  slots.push(saved);
+  writeLocal(VAC_KEY, slots);
+  return saved;
 }
 
 async function createHoliday(event) {
@@ -278,7 +322,10 @@ function render() {
 
 function renderBookingOptions(yearSlots) {
   const openSlots = yearSlots.filter(slot => slot.status !== "drawn");
-  el.bookingSlot.innerHTML = openSlots.map(slot => `<option value="${slot.id}">${escapeHtml(slotDateLabel(slot))}</option>`).join("");
+  el.bookingSlot.innerHTML = [
+    `<option value="">เลือกจาก Loc ที่เปิดไว้ หรือเลือกวันเริ่มด้านล่าง</option>`,
+    ...openSlots.map(slot => `<option value="${slot.id}">${escapeHtml(slotDateLabel(slot))}</option>`)
+  ].join("");
 }
 
 function renderYear(slotDayMap, holidayMap) {
@@ -295,12 +342,24 @@ function renderYear(slotDayMap, holidayMap) {
       const holidays = holidayMap.get(key) || [];
       const isWeekend = date.getDay() === 0 || date.getDay() === 6;
       const winner = daySlots.find(item => item.winner_name)?.winner_name;
+      const openSlot = daySlots.find(item => item.status !== "drawn");
       const classes = ["year-cell", isWeekend ? "weekend" : "", daySlots.length ? "has-slot" : "", winner ? "has-winner" : "", holidays.length ? "has-holiday" : ""].filter(Boolean).join(" ");
       const label = winner ? winner : daySlots.length ? `จอง ${candidateCount(daySlots[0].id)} คน` : holidays.length ? `หยุด ${displayNames(holidays.map(h => h.name))}` : "";
-      cells.push(`<button class="${classes}" type="button"><span class="weekday-mini">${thDays[date.getDay()]}</span>${label ? `<span class="cell-label">${escapeHtml(label)}</span>` : ""}</button>`);
+      const slotAttr = openSlot ? ` data-book-slot="${openSlot.id}"` : "";
+      cells.push(`<button class="${classes}" type="button"${slotAttr}><span class="weekday-mini">${thDays[date.getDay()]}</span>${label ? `<span class="cell-label">${escapeHtml(label)}</span>` : ""}</button>`);
     }
   });
   el.yearOverview.innerHTML = cells.join("");
+  el.yearOverview.querySelectorAll("[data-book-slot]").forEach(button => {
+    button.addEventListener("click", () => selectSlotForBooking(button.dataset.bookSlot));
+  });
+}
+
+function selectSlotForBooking(slotId) {
+  setTab("booking");
+  el.bookingSlot.value = slotId;
+  el.bookingStart.value = "";
+  el.bookingName.focus();
 }
 
 function renderOpenSlots(items) {
@@ -423,8 +482,13 @@ function syncDateBounds() {
   const firstMonday = nextMondayOnOrAfter(minDate);
   el.slotStart.min = minDate;
   el.slotStart.max = maxDate;
+  el.bookingStart.min = minDate;
+  el.bookingStart.max = maxDate;
   if (!el.slotStart.value || el.slotStart.value < minDate || el.slotStart.value > maxDate || !isMondayText(el.slotStart.value)) {
     el.slotStart.value = firstMonday;
+  }
+  if (el.bookingStart.value && (el.bookingStart.value < minDate || el.bookingStart.value > maxDate || !isMondayText(el.bookingStart.value))) {
+    el.bookingStart.value = "";
   }
   el.holidayDate.min = minDate;
   el.holidayDate.max = maxDate;
@@ -447,6 +511,12 @@ function overlapsFiscalYear(start, end) {
 
 function readLocal(key) { try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; } }
 function writeLocal(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+function validateMonday(dateText, input) {
+  if (isMondayText(dateText)) return true;
+  alert("วันเริ่ม Loc ต้องเป็นวันจันทร์เท่านั้น เพราะ 1 Loc คือจันทร์-ศุกร์");
+  input?.focus();
+  return false;
+}
 function defaultSlotLabel(start, end) { return `${formatShort(start)}-${formatShort(end)}`; }
 function slotDateLabel(slot) { return `${formatDate(slot.start_date)} - ${formatDate(slot.end_date)}`; }
 function slotDisplayTitle(slot) {
