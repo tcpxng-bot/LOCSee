@@ -22,6 +22,7 @@
     <header class="hero card">
       <img class="brand-logo" src="./assets/locsee-logo.png" alt="LOCSee">
       <p class="status" id="statusText">กำลังโหลดข้อมูล...</p>
+      <button class="btn small ghost" id="logoutBtn" type="button">ออกจากระบบ</button>
     </header>
 
     <nav class="tabs card">
@@ -67,8 +68,11 @@
 
         <form class="card form" id="bookingForm">
           <h2>ลงชื่อจอง Loc</h2>
-          <label>เลือก Loc</label>
-          <select class="input" id="bookingSlot" required></select>
+          <label>เลือก Loc ที่เปิดไว้</label>
+          <select class="input" id="bookingSlot"></select>
+          <label>หรือเลือกวันเริ่ม Loc</label>
+          <input class="input" id="bookingStart" type="date">
+          <p class="hint">เลือกวันจันทร์ที่ต้องการจอง ระบบจะนับเป็นช่วงจันทร์-ศุกร์ให้อัตโนมัติ</p>
           <label>ชื่อผู้จอง</label>
           <input class="input" id="bookingName" placeholder="เช่น พี่แป้ง" required>
           <button class="btn primary" type="submit">ลงชื่อจอง</button>
