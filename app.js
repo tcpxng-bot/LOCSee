@@ -29,8 +29,10 @@ const BASE_HOLIDAYS = [
 ];
 
 const cfg = window.LOCVAC_SUPABASE || {};
-const hasSupabase = Boolean(cfg.url && cfg.anonKey && window.supabase);
-const db = hasSupabase ? window.supabase.createClient(cfg.url, cfg.anonKey) : null;
+const supabaseUrl = normalizeSupabaseUrl(cfg.url);
+const supabaseAnonKey = String(cfg.anonKey || "").trim();
+const hasSupabase = Boolean(supabaseUrl && supabaseAnonKey && window.supabase);
+const db = hasSupabase ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null;
 
 let selectedFiscalYear = Number(localStorage.getItem(YEAR_KEY) || "2570");
 let MONTHS = buildFiscalMonths(selectedFiscalYear);
@@ -40,6 +42,17 @@ let maxDate = "";
 let slots = [];
 let bookings = [];
 let customHolidays = [];
+
+function normalizeSupabaseUrl(rawUrl) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    return `${url.protocol}//${url.host}`;
+  } catch (error) {
+    return value.replace(/\/rest\/v1\/?$/i, "").replace(/\/+$/, "");
+  }
+}
 
 const el = {
   loginGate: document.querySelector("#loginGate"),
