@@ -20,7 +20,7 @@ body {
   min-height: 100vh;
   color: var(--ink);
   font-family: "TH Sarabun New", "TH SarabunPSK", "Sarabun", Tahoma, sans-serif;
-  font-size: 20px;
+  font-size: 18px;
   background:
     linear-gradient(90deg, rgba(47,53,66,.035) 1px, transparent 1px),
     linear-gradient(rgba(47,53,66,.035) 1px, transparent 1px),
@@ -31,9 +31,9 @@ body {
 button, input, select { font: inherit; }
 
 .app {
-  width: min(1220px, calc(100vw - 28px));
+  width: min(1320px, calc(100vw - 20px));
   margin: 0 auto;
-  padding: 18px 0 40px;
+  padding: 8px 0 32px;
 }
 
 .app.is-locked, .login-gate.is-unlocked { display: none; }
@@ -66,36 +66,44 @@ button, input, select { font: inherit; }
 .hero {
   display: grid;
   justify-items: center;
-  gap: 8px;
-  padding: 14px 18px 12px;
+  gap: 4px;
+  padding: 0 12px 8px;
   overflow: hidden;
 }
 
+.hero.card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .brand-logo {
-  width: min(560px, 94vw);
-  max-height: 210px;
+  width: min(300px, 76vw);
+  max-height: 140px;
   object-fit: contain;
 }
 
 .status, .note {
   margin: 0;
-  padding: 8px 14px;
+  padding: 5px 12px;
   border: 2px solid rgba(47,53,66,.32);
   border-radius: 999px;
   background: rgba(255,253,248,.84);
   color: var(--muted);
+  font-size: 16px;
 }
 
 .tabs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  margin-top: 18px;
+  margin-top: 8px;
   padding: 8px;
 }
 
 .tab, .btn, .input {
-  min-height: 42px;
+  min-height: 38px;
   border: 3px solid var(--line);
   border-radius: 14px;
   background: white;
@@ -113,10 +121,10 @@ button, input, select { font: inherit; }
   display: grid;
   grid-template-columns: 1fr 160px auto;
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
-.panel { display: none; margin-top: 18px; }
+.panel { display: none; margin-top: 12px; }
 .panel.is-active { display: block; }
 
 .section-head {
@@ -161,20 +169,20 @@ h2 { margin-bottom: 10px; }
 .swatch.holiday { background: var(--yellow); }
 .swatch.weekend { background: var(--orange); }
 
-.year-scroll { overflow-x: auto; background: var(--card); }
+.year-scroll { overflow-x: auto; background: var(--card); border-width: 3px; }
 .year-table {
-  min-width: 1240px;
+  min-width: 1110px;
   display: grid;
-  grid-template-columns: 150px repeat(31, minmax(30px, 1fr));
+  grid-template-columns: 128px repeat(31, minmax(28px, 1fr));
   gap: 2px;
   padding: 2px;
   background: var(--line);
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
 }
 
 .year-cell {
-  min-height: 46px;
+  min-height: 38px;
   border: 0;
   border-radius: 7px;
   background: white;
@@ -191,7 +199,7 @@ h2 { margin-bottom: 10px; }
   z-index: 2;
   justify-items: start;
   padding-left: 8px;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 900;
 }
 
@@ -201,7 +209,7 @@ h2 { margin-bottom: 10px; }
 .has-slot { background: var(--blue); font-weight: 900; cursor: pointer; }
 .has-winner { background: var(--green); }
 .has-holiday { background: var(--yellow); }
-.weekday-mini { font-size: 13px; font-weight: 700; }
+.weekday-mini { font-size: 12px; font-weight: 700; }
 .cell-label {
   width: 100%;
   margin-top: 2px;
@@ -257,5 +265,5 @@ h2 { margin-bottom: 10px; }
 
 @media (max-width: 920px) {
   .tabs, .toolbar, .grid.two, .section-head { grid-template-columns: 1fr; }
-  .brand-logo { max-height: 170px; }
+  .brand-logo { max-height: 118px; }
 }
