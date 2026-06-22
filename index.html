@@ -32,7 +32,7 @@
     </nav>
 
     <section class="toolbar">
-      <input class="input" id="search" type="search" placeholder="ค้นหาชื่อ / Loc / วันที่">
+      <input class="input" id="search" type="search" placeholder="ค้นหาชื่อ / วันที่">
       <select class="input" id="fiscalYearSelect"></select>
       <button class="btn" id="reloadBtn" type="button">รีเฟรช</button>
     </section>
@@ -57,12 +57,12 @@
       <div class="grid two">
         <form class="card form" id="slotForm">
           <h2>สร้าง Loc ใหม่</h2>
-          <label>ชื่อ Loc / หมายเหตุ</label>
-          <input class="input" id="slotLabel" placeholder="เช่น Loc เม.ย. ช่วงสงกรานต์">
           <label>วันเริ่ม Loc</label>
           <input class="input" id="slotStart" type="date" required>
-          <p class="hint">ระบบจะนับ 1 Loc = จันทร์-ศุกร์ (5 วันทำการ) และใส่วันสิ้นสุดให้อัตโนมัติ</p>
-          <button class="btn primary" type="submit">เปิด Loc ให้จอง</button>
+          <label>ผู้ได้ Loc Vacation</label>
+          <input class="input" id="directWinnerName" placeholder="ใส่ชื่อถ้ารู้ผู้ได้ Loc แล้ว">
+          <p class="hint">ใส่ชื่อผู้ได้ Loc ได้ทันที หรือเว้นว่างไว้เพื่อเปิดให้จอง/จับฉลากภายหลัง · 1 Loc = จันทร์-ศุกร์</p>
+          <button class="btn primary" type="submit">บันทึก Loc</button>
         </form>
 
         <form class="card form" id="bookingForm">
