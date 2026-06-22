@@ -210,6 +210,15 @@ async function drawSlot(slotId) {
   const slotBookings = bookings.filter(item => item.slot_id === slotId);
   if (!slotBookings.length) return alert("ยังไม่มีคนจอง Loc นี้");
   const winner = slotBookings[Math.floor(Math.random() * slotBookings.length)].person_name;
+  await setWinner(slotId, winner);
+}
+
+async function chooseWinner(slotId, winner) {
+  if (!winner) return alert("กรุณาเลือกชื่อผู้ได้ Loc");
+  await setWinner(slotId, winner);
+}
+
+async function setWinner(slotId, winner) {
   if (hasSupabase) {
     const { error } = await db.from("loc_slots").update({ winner_name: winner, status: "drawn" }).eq("id", slotId);
     if (error) return alert(error.message);
@@ -301,6 +310,10 @@ function renderDrawList(items) {
 function slotCard(slot) {
   const slotBookings = bookings.filter(item => item.slot_id === slot.id);
   const candidates = slotBookings.map(item => escapeHtml(item.person_name)).join(", ") || "ยังไม่มีผู้จอง";
+  const winnerOptions = slotBookings.map(item => {
+    const selected = item.person_name === slot.winner_name ? "selected" : "";
+    return `<option value="${escapeHtml(item.person_name)}" ${selected}>${escapeHtml(item.person_name)}</option>`;
+  }).join("");
   return `
     <article class="slot-card">
       <div class="slot-top">
@@ -315,12 +328,27 @@ function slotCard(slot) {
           <button class="btn danger" type="button" data-delete-slot="${slot.id}">ลบ Loc</button>
         </div>
       </div>
+      ${slotBookings.length ? `
+        <div class="manual-winner">
+          <select class="input compact-input" data-winner-select="${slot.id}">
+            <option value="">เลือกผู้ได้ Loc เอง</option>
+            ${winnerOptions}
+          </select>
+          <button class="btn" type="button" data-choose-winner="${slot.id}">บันทึกผู้ได้</button>
+        </div>
+      ` : ""}
     </article>
   `;
 }
 
 function bindSlotActions(root) {
   root.querySelectorAll("[data-draw]").forEach(btn => btn.addEventListener("click", () => drawSlot(btn.dataset.draw)));
+  root.querySelectorAll("[data-choose-winner]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const select = root.querySelector(`[data-winner-select="${CSS.escape(btn.dataset.chooseWinner)}"]`);
+      chooseWinner(btn.dataset.chooseWinner, select?.value || "");
+    });
+  });
   root.querySelectorAll("[data-delete-slot]").forEach(btn => btn.addEventListener("click", () => deleteItem("slot", btn.dataset.deleteSlot)));
 }
 
