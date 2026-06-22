@@ -68,6 +68,7 @@ const el = {
   fiscalYearSelect: document.querySelector("#fiscalYearSelect"),
   reloadBtn: document.querySelector("#reloadBtn"),
   yearOverview: document.querySelector("#yearOverview"),
+  dayDetails: document.querySelector("#dayDetails"),
   slotForm: document.querySelector("#slotForm"),
   slotStart: document.querySelector("#slotStart"),
   directWinnerName: document.querySelector("#directWinnerName"),
@@ -80,6 +81,7 @@ const el = {
   winnerSummary: document.querySelector("#winnerSummary"),
   recentList: document.querySelector("#recentList"),
   holidayForm: document.querySelector("#holidayForm"),
+  holidaySummary: document.querySelector("#holidaySummary"),
   holidayName: document.querySelector("#holidayName"),
   holidayDate: document.querySelector("#holidayDate"),
   note: document.querySelector("#note")
@@ -305,18 +307,17 @@ function render() {
   const slotDayMap = groupByDate(slotDays);
   const holidayMap = groupHolidays();
   const query = el.search.value.trim().toLowerCase();
-  const filteredSlots = yearSlots.filter(slot => {
-    const candidates = bookings.filter(item => item.slot_id === slot.id).map(item => item.person_name).join(" ");
-    return `${slot.label} ${slot.start_date} ${slot.end_date} ${slot.winner_name || ""} ${candidates}`.toLowerCase().includes(query);
-  });
+  const filteredSlots = yearSlots.filter(slot => slotMatchesQuery(slot, query));
   const bookingCount = bookings.filter(item => yearSlots.some(slot => slot.id === item.slot_id)).length;
   el.statusText.textContent = `${hasSupabase ? "ออนไลน์/Supabase" : "ทดลองในเครื่อง/localStorage"} · ปี ${selectedFiscalYear} · Loc ${yearSlots.length} รายการ · ผู้จอง ${bookingCount} รายชื่อ`;
   el.note.textContent = `1 Loc = ${LOCK_DAYS} วันทำการ ไม่นับเสาร์-อาทิตย์ · Loc หนึ่งจองได้หลายคน แล้วจับฉลากหรือเลือกผู้ได้ Loc เอง`;
   renderBookingOptions(yearSlots);
-  renderYear(slotDayMap, holidayMap);
+  renderYear(slotDayMap, holidayMap, query);
+  renderSearchDetails(query, filteredSlots, holidayMap);
   renderOpenSlots(filteredSlots);
   renderDrawList(filteredSlots);
   renderSummary(yearSlots);
+  renderHolidaySummary();
   renderRecent(yearSlots);
 }
 
@@ -328,7 +329,7 @@ function renderBookingOptions(yearSlots) {
   ].join("");
 }
 
-function renderYear(slotDayMap, holidayMap) {
+function renderYear(slotDayMap, holidayMap, query = "") {
   const cells = [`<div class="year-cell day-head">เดือน</div>`];
   for (let day = 1; day <= 31; day++) cells.push(`<div class="year-cell day-head">${day}</div>`);
   MONTHS.forEach((month, index) => {
@@ -342,15 +343,94 @@ function renderYear(slotDayMap, holidayMap) {
       const holidays = holidayMap.get(key) || [];
       const isWeekend = date.getDay() === 0 || date.getDay() === 6;
       const winner = daySlots.find(item => item.winner_name)?.winner_name;
-      const openSlot = daySlots.find(item => item.status !== "drawn");
-      const classes = ["year-cell", isWeekend ? "weekend" : "", daySlots.length ? "has-slot" : "", winner ? "has-winner" : "", holidays.length ? "has-holiday" : ""].filter(Boolean).join(" ");
+      const hasInfo = daySlots.length || holidays.length;
+      const isHit = query && (daySlots.some(slot => slotMatchesQuery(slot, query)) || holidays.some(item => holidayMatchesQuery(item, query)));
+      const isMuted = query && hasInfo && !isHit;
+      const classes = ["year-cell", isWeekend ? "weekend" : "", daySlots.length ? "has-slot" : "", winner ? "has-winner" : "", holidays.length ? "has-holiday" : "", isHit ? "search-hit" : "", isMuted ? "search-muted" : ""].filter(Boolean).join(" ");
       const label = winner ? winner : daySlots.length ? `จอง ${candidateCount(daySlots[0].id)} คน` : holidays.length ? `หยุด ${displayNames(holidays.map(h => h.name))}` : "";
-      const slotAttr = openSlot ? ` data-book-slot="${openSlot.id}"` : "";
-      cells.push(`<button class="${classes}" type="button"${slotAttr}><span class="weekday-mini">${thDays[date.getDay()]}</span>${label ? `<span class="cell-label">${escapeHtml(label)}</span>` : ""}</button>`);
+      const dateAttr = daySlots.length || holidays.length ? ` data-detail-date="${key}"` : "";
+      cells.push(`<button class="${classes}" type="button"${dateAttr}><span class="weekday-mini">${thDays[date.getDay()]}</span>${label ? `<span class="cell-label">${escapeHtml(label)}</span>` : ""}</button>`);
     }
   });
   el.yearOverview.innerHTML = cells.join("");
-  el.yearOverview.querySelectorAll("[data-book-slot]").forEach(button => {
+  el.yearOverview.querySelectorAll("[data-detail-date]").forEach(button => {
+    button.addEventListener("click", () => showDayDetails(button.dataset.detailDate, slotDayMap, holidayMap));
+  });
+}
+
+function renderSearchDetails(query, matchedSlots, holidayMap) {
+  if (!query) {
+    el.dayDetails.innerHTML = `
+      <strong>กดช่องในตารางเพื่อดูรายละเอียด</strong>
+      <span>หรือพิมพ์ชื่อ / วันที่ในช่องค้นหาเพื่อไฮไลต์รายการบนตาราง</span>
+    `;
+    return;
+  }
+  const matchedHolidays = [...holidayMap.values()].flat().filter(item => holidayMatchesQuery(item, query));
+  const slotRows = matchedSlots.map(slot => {
+    const slotBookings = bookings.filter(item => item.slot_id === slot.id).map(item => item.person_name);
+    const status = slot.winner_name ? `ผู้ได้ Loc: ${slot.winner_name}` : `รอจับฉลาก (${slotBookings.length} คนจอง)`;
+    const bookButton = slot.status !== "drawn" ? `<button class="btn small" type="button" data-book-slot="${slot.id}">จองรอบนี้</button>` : "";
+    return `
+      <div class="detail-row">
+        <strong>${escapeHtml(status)}</strong>
+        <span>${slotDateLabel(slot)}</span>
+        <small>ผู้จอง: ${escapeHtml(slotBookings.join(", ") || "ยังไม่มี")}</small>
+        ${bookButton}
+      </div>
+    `;
+  }).join("");
+  const holidayRows = matchedHolidays.map(item => `
+    <div class="detail-row holiday-row">
+      <strong>วันหยุดพิเศษ</strong>
+      <span>${escapeHtml(item.name)}</span>
+      <small>${formatDate(item.holiday_date)}</small>
+    </div>
+  `).join("");
+  const total = matchedSlots.length + matchedHolidays.length;
+  el.dayDetails.innerHTML = `
+    <div class="detail-head">
+      <strong>ผลค้นหา: ${escapeHtml(query)}</strong>
+      <span>${total ? `${total} รายการ` : "ไม่พบรายการ"}</span>
+    </div>
+    <div class="detail-list">${slotRows}${holidayRows || ""}</div>
+  `;
+  if (!total) el.dayDetails.querySelector(".detail-list").innerHTML = `<div class="detail-row"><strong>ไม่พบข้อมูลที่ตรงกัน</strong><span>ลองค้นด้วยชื่อเล่นหรือวันที่ เช่น 12/01/2570</span></div>`;
+  el.dayDetails.querySelectorAll("[data-book-slot]").forEach(button => {
+    button.addEventListener("click", () => selectSlotForBooking(button.dataset.bookSlot));
+  });
+}
+
+function showDayDetails(dateText, slotDayMap, holidayMap) {
+  const daySlots = slotDayMap.get(dateText) || [];
+  const holidays = holidayMap.get(dateText) || [];
+  const slotRows = daySlots.map(slot => {
+    const slotBookings = bookings.filter(item => item.slot_id === slot.id).map(item => item.person_name);
+    const status = slot.winner_name ? `ผู้ได้ Loc: ${slot.winner_name}` : `รอจับฉลาก (${slotBookings.length} คนจอง)`;
+    const bookButton = slot.status !== "drawn" ? `<button class="btn small" type="button" data-book-slot="${slot.id}">จองรอบนี้</button>` : "";
+    return `
+      <div class="detail-row">
+        <strong>${escapeHtml(status)}</strong>
+        <span>${slotDateLabel(slot)}</span>
+        <small>ผู้จอง: ${escapeHtml(slotBookings.join(", ") || "ยังไม่มี")}</small>
+        ${bookButton}
+      </div>
+    `;
+  }).join("");
+  const holidayRows = holidays.map(item => `
+    <div class="detail-row holiday-row">
+      <strong>วันหยุดพิเศษ</strong>
+      <span>${escapeHtml(item.name)}</span>
+    </div>
+  `).join("");
+  el.dayDetails.innerHTML = `
+    <div class="detail-head">
+      <strong>${formatDate(dateText)}</strong>
+      <span>${daySlots.length ? `${daySlots.length} Loc` : ""}${daySlots.length && holidays.length ? " · " : ""}${holidays.length ? `${holidays.length} วันหยุด` : ""}</span>
+    </div>
+    <div class="detail-list">${slotRows}${holidayRows}</div>
+  `;
+  el.dayDetails.querySelectorAll("[data-book-slot]").forEach(button => {
     button.addEventListener("click", () => selectSlotForBooking(button.dataset.bookSlot));
   });
 }
@@ -417,12 +497,35 @@ function bindSlotActions(root) {
 }
 
 function renderSummary(yearSlots) {
-  const counts = new Map();
-  yearSlots.filter(slot => slot.winner_name).forEach(slot => counts.set(slot.winner_name, (counts.get(slot.winner_name) || 0) + 1));
-  const rows = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"));
+  const groups = new Map();
+  yearSlots.filter(slot => slot.winner_name).forEach(slot => {
+    if (!groups.has(slot.winner_name)) groups.set(slot.winner_name, []);
+    groups.get(slot.winner_name).push(slot);
+  });
+  const rows = [...groups.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "th"));
   el.winnerSummary.innerHTML = rows.length
-    ? rows.map(([name, count]) => `<div class="person-row"><strong>${escapeHtml(name)}</strong><span>${count} ล็อค</span></div>`).join("")
+    ? rows.map(([name, personSlots], index) => `
+      <div class="person-row compact">
+        <span class="rank">${index + 1}</span>
+        <strong>${escapeHtml(name)}</strong>
+        <span class="count-pill">${personSlots.length} ล็อค</span>
+        <small>${escapeHtml(personSlots.map(slot => `${formatShort(slot.start_date)}-${formatShort(slot.end_date)}`).join(", "))}</small>
+      </div>
+    `).join("")
     : `<div class="slot-card">ยังไม่มีผลจับฉลาก</div>`;
+}
+
+function renderHolidaySummary() {
+  const holidayMap = groupHolidays();
+  const rows = [...holidayMap.values()].flat().sort((a, b) => a.holiday_date.localeCompare(b.holiday_date));
+  el.holidaySummary.innerHTML = rows.length
+    ? rows.map(item => `
+      <div class="holiday-item">
+        <strong>${escapeHtml(item.name)}</strong>
+        <span>${formatDate(item.holiday_date)}</span>
+      </div>
+    `).join("")
+    : `<p class="hint">ยังไม่มีวันหยุดพิเศษในปีนี้</p>`;
 }
 
 function renderRecent(yearSlots) {
@@ -517,6 +620,26 @@ function validateMonday(dateText, input) {
   input?.focus();
   return false;
 }
+function slotMatchesQuery(slot, query) {
+  if (!query) return true;
+  const candidates = bookings.filter(item => item.slot_id === slot.id).map(item => item.person_name).join(" ");
+  return searchableText([
+    slot.label,
+    slot.start_date,
+    slot.end_date,
+    formatDate(slot.start_date),
+    formatDate(slot.end_date),
+    formatShort(slot.start_date),
+    formatShort(slot.end_date),
+    slot.winner_name || "",
+    candidates
+  ]).includes(query);
+}
+function holidayMatchesQuery(item, query) {
+  if (!query) return true;
+  return searchableText([item.name, item.holiday_date, formatDate(item.holiday_date), formatShort(item.holiday_date)]).includes(query);
+}
+function searchableText(parts) { return parts.join(" ").toLowerCase(); }
 function defaultSlotLabel(start, end) { return `${formatShort(start)}-${formatShort(end)}`; }
 function slotDateLabel(slot) { return `${formatDate(slot.start_date)} - ${formatDate(slot.end_date)}`; }
 function slotDisplayTitle(slot) {
