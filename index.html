@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LOCSee Booking</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <section class="login-gate" id="loginGate">
+    <form class="login-card card" id="loginForm">
+      <img class="login-logo" src="./assets/locsee-logo.png" alt="LOCSee">
+      <h1>เข้าสู่ LOCSee</h1>
+      <p>ใส่รหัสของวอร์ดเพื่อเปิดระบบจอง Loc Vacation</p>
+      <input class="input" id="passwordInput" type="password" placeholder="รหัสผ่าน">
+      <button class="btn primary" type="submit">เข้าสู่ระบบ</button>
+      <small id="loginMessage"></small>
+    </form>
+  </section>
+
+  <main class="app is-locked" id="appShell">
+    <header class="hero card">
+      <img class="brand-logo" src="./assets/locsee-logo.png" alt="LOCSee">
+      <p class="status" id="statusText">กำลังโหลดข้อมูล...</p>
+    </header>
+
+    <nav class="tabs card">
+      <button class="tab is-active" type="button" data-tab="overview">ภาพรวมทั้งปี</button>
+      <button class="tab" type="button" data-tab="booking">จอง Loc</button>
+      <button class="tab" type="button" data-tab="draw">จับฉลาก/จัดการ</button>
+      <button class="tab" type="button" data-tab="summary">สรุป</button>
+    </nav>
+
+    <section class="toolbar">
+      <input class="input" id="search" type="search" placeholder="ค้นหาชื่อ / Loc / วันที่">
+      <select class="input" id="fiscalYearSelect"></select>
+      <button class="btn" id="reloadBtn" type="button">รีเฟรช</button>
+    </section>
+
+    <section class="panel is-active" data-panel="overview">
+      <div class="section-head">
+        <h2>ภาพรวมทั้งปี</h2>
+        <p>Loc ที่ยังไม่จับฉลากจะแสดงจำนวนผู้จอง ถ้าจับแล้วจะแสดงชื่อผู้ได้ Loc</p>
+      </div>
+      <div class="legend">
+        <span><i class="swatch loc"></i>Loc เปิดจอง</span>
+        <span><i class="swatch won"></i>จับแล้ว</span>
+        <span><i class="swatch holiday"></i>วันหยุดพิเศษ</span>
+        <span><i class="swatch weekend"></i>เสาร์-อาทิตย์</span>
+      </div>
+      <div class="year-scroll card">
+        <div class="year-table" id="yearOverview"></div>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="booking">
+      <div class="grid two">
+        <form class="card form" id="slotForm">
+          <h2>สร้าง Loc ใหม่</h2>
+          <label>ชื่อ Loc / หมายเหตุ</label>
+          <input class="input" id="slotLabel" placeholder="เช่น Loc เม.ย. ช่วงสงกรานต์">
+          <label>วันเริ่ม Loc</label>
+          <input class="input" id="slotStart" type="date" required>
+          <p class="hint">ระบบจะนับ 1 Loc = 5 วัน และใส่วันสิ้นสุดให้อัตโนมัติ</p>
+          <button class="btn primary" type="submit">เปิด Loc ให้จอง</button>
+        </form>
+
+        <form class="card form" id="bookingForm">
+          <h2>ลงชื่อจอง Loc</h2>
+          <label>เลือก Loc</label>
+          <select class="input" id="bookingSlot" required></select>
+          <label>ชื่อผู้จอง</label>
+          <input class="input" id="bookingName" placeholder="เช่น พี่แป้ง" required>
+          <button class="btn primary" type="submit">ลงชื่อจอง</button>
+        </form>
+      </div>
+
+      <h2 class="section-title">Loc ที่เปิดจอง</h2>
+      <div class="slot-list" id="openSlotList"></div>
+    </section>
+
+    <section class="panel" data-panel="draw">
+      <div class="section-head">
+        <h2>จับฉลากหน้างาน</h2>
+        <p>Loc หนึ่งสามารถมีคนจองหลายคน กดจับฉลากเพื่อเลือกผู้ได้ Loc</p>
+      </div>
+      <div class="slot-list" id="drawList"></div>
+    </section>
+
+    <section class="panel" data-panel="summary">
+      <div class="grid two">
+        <article class="card">
+          <h2>สรุปผู้ได้ Loc</h2>
+          <div class="person-list" id="winnerSummary"></div>
+        </article>
+        <form class="card form" id="holidayForm">
+          <h2>วันหยุดพิเศษ</h2>
+          <label>ชื่อวันหยุด</label>
+          <input class="input" id="holidayName" placeholder="เช่น วันจักรี">
+          <label>วันที่</label>
+          <input class="input" id="holidayDate" type="date">
+          <button class="btn primary" type="submit">เพิ่มวันหยุดพิเศษ</button>
+        </form>
+      </div>
+      <h2 class="section-title">รายการล่าสุด</h2>
+      <div class="slot-list" id="recentList"></div>
+    </section>
+
+    <p class="note" id="note"></p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
