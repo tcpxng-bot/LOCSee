@@ -154,7 +154,12 @@ async function createSlot(event) {
   event.preventDefault();
   const start = el.slotStart.value;
   if (!start) return;
-  const end = addDays(start, LOCK_DAYS - 1);
+  if (!isMondayText(start)) {
+    alert("วันเริ่ม Loc ต้องเป็นวันจันทร์เท่านั้น เพราะ 1 Loc คือจันทร์-ศุกร์");
+    el.slotStart.focus();
+    return;
+  }
+  const end = addBusinessDays(start, LOCK_DAYS);
   const item = {
     label: el.slotLabel.value.trim() || `Loc ${formatShort(start)}-${formatShort(end)}`,
     start_date: start,
@@ -261,7 +266,7 @@ function render() {
   });
   const bookingCount = bookings.filter(item => yearSlots.some(slot => slot.id === item.slot_id)).length;
   el.statusText.textContent = `${hasSupabase ? "ออนไลน์/Supabase" : "ทดลองในเครื่อง/localStorage"} · ปี ${selectedFiscalYear} · Loc ${yearSlots.length} รายการ · ผู้จอง ${bookingCount} รายชื่อ`;
-  el.note.textContent = `1 Loc = ${LOCK_DAYS} วัน · Loc หนึ่งจองได้หลายคน แล้วจับฉลากเลือกผู้ได้ Loc ตอนหน้างาน`;
+  el.note.textContent = `1 Loc = ${LOCK_DAYS} วันทำการ ไม่นับเสาร์-อาทิตย์ · Loc หนึ่งจองได้หลายคน แล้วจับฉลากหรือเลือกผู้ได้ Loc เอง`;
   renderBookingOptions(yearSlots);
   renderYear(slotDayMap, holidayMap);
   renderOpenSlots(filteredSlots);
@@ -319,7 +324,7 @@ function slotCard(slot) {
       <div class="slot-top">
         <div>
           <div class="slot-title">${escapeHtml(slot.label)}</div>
-          <div class="slot-meta">${formatDate(slot.start_date)} - ${formatDate(slot.end_date)} · ${slotBookings.length} คนจอง</div>
+          <div class="slot-meta">${formatDate(slot.start_date)} - ${formatDate(slot.end_date)} · ${LOCK_DAYS} วันทำการ · ${slotBookings.length} คนจอง</div>
           <div class="candidate-list">${candidates}</div>
           ${slot.winner_name ? `<div class="winner">ผู้ได้ Loc: ${escapeHtml(slot.winner_name)}</div>` : ""}
         </div>
@@ -370,6 +375,7 @@ function expandSlots(items) {
   const days = [];
   items.forEach(slot => {
     for (let date = new Date(`${slot.start_date}T00:00:00`); date <= new Date(`${slot.end_date}T00:00:00`); date.setDate(date.getDate() + 1)) {
+      if (isWeekendDate(date)) continue;
       days.push({ date: iso(date), ...slot });
     }
   });
@@ -414,10 +420,15 @@ function syncDateBounds() {
   const first = MONTHS[0], last = MONTHS[MONTHS.length - 1];
   const minDate = `${first.adYear}-${String(first.month).padStart(2, "0")}-01`;
   const maxDate = iso(new Date(last.adYear, last.month, 0));
-  for (const input of [el.slotStart, el.holidayDate]) {
-    input.min = minDate; input.max = maxDate;
-    if (!input.value || input.value < minDate || input.value > maxDate) input.value = minDate;
+  const firstMonday = nextMondayOnOrAfter(minDate);
+  el.slotStart.min = minDate;
+  el.slotStart.max = maxDate;
+  if (!el.slotStart.value || el.slotStart.value < minDate || el.slotStart.value > maxDate || !isMondayText(el.slotStart.value)) {
+    el.slotStart.value = firstMonday;
   }
+  el.holidayDate.min = minDate;
+  el.holidayDate.max = maxDate;
+  if (!el.holidayDate.value || el.holidayDate.value < minDate || el.holidayDate.value > maxDate) el.holidayDate.value = minDate;
 }
 
 function isInSelectedFiscalYear(dateText) {
@@ -436,6 +447,22 @@ function overlapsFiscalYear(start, end) {
 
 function readLocal(key) { try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; } }
 function writeLocal(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+function addBusinessDays(dateText, count) {
+  const date = new Date(`${dateText}T00:00:00`);
+  let added = 0;
+  while (added < count) {
+    if (!isWeekendDate(date)) added += 1;
+    if (added < count) date.setDate(date.getDate() + 1);
+  }
+  return iso(date);
+}
+function isMondayText(dateText) { return new Date(`${dateText}T00:00:00`).getDay() === 1; }
+function nextMondayOnOrAfter(dateText) {
+  const date = new Date(`${dateText}T00:00:00`);
+  while (date.getDay() !== 1) date.setDate(date.getDate() + 1);
+  return iso(date);
+}
+function isWeekendDate(date) { return date.getDay() === 0 || date.getDay() === 6; }
 function addDays(dateText, days) { const d = new Date(`${dateText}T00:00:00`); d.setDate(d.getDate() + days); return iso(d); }
 function iso(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
 function formatDate(dateText) { return longDate.format(new Date(`${dateText}T00:00:00`)); }
