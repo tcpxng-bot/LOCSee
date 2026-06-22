@@ -52,6 +52,10 @@
       <div class="year-scroll card">
         <div class="year-table" id="yearOverview"></div>
       </div>
+      <div class="day-details card" id="dayDetails">
+        <strong>กดช่องในตารางเพื่อดูรายละเอียด</strong>
+        <span>ถ้ามี Loc เปิดจองหรือมีผู้ได้ Loc รายละเอียดจะแสดงตรงนี้</span>
+      </div>
     </section>
 
     <section class="panel" data-panel="booking">
@@ -104,6 +108,7 @@
           <label>วันที่</label>
           <input class="input" id="holidayDate" type="date">
           <button class="btn primary" type="submit">เพิ่มวันหยุดพิเศษ</button>
+          <div class="holiday-summary" id="holidaySummary"></div>
         </form>
       </div>
       <h2 class="section-title">รายการล่าสุด</h2>
