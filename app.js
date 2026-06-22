@@ -68,8 +68,8 @@ const el = {
   reloadBtn: document.querySelector("#reloadBtn"),
   yearOverview: document.querySelector("#yearOverview"),
   slotForm: document.querySelector("#slotForm"),
-  slotLabel: document.querySelector("#slotLabel"),
   slotStart: document.querySelector("#slotStart"),
+  directWinnerName: document.querySelector("#directWinnerName"),
   bookingForm: document.querySelector("#bookingForm"),
   bookingSlot: document.querySelector("#bookingSlot"),
   bookingName: document.querySelector("#bookingName"),
@@ -160,12 +160,13 @@ async function createSlot(event) {
     return;
   }
   const end = addBusinessDays(start, LOCK_DAYS);
+  const directWinner = el.directWinnerName.value.trim();
   const item = {
-    label: el.slotLabel.value.trim() || `Loc ${formatShort(start)}-${formatShort(end)}`,
+    label: defaultSlotLabel(start, end),
     start_date: start,
     end_date: end,
-    winner_name: null,
-    status: "open"
+    winner_name: directWinner || null,
+    status: directWinner ? "drawn" : "open"
   };
   if (hasSupabase) {
     const { error } = await db.from("loc_slots").insert(item);
@@ -174,7 +175,7 @@ async function createSlot(event) {
     slots.push({ id: crypto.randomUUID(), created_at: new Date().toISOString(), ...item });
     writeLocal(VAC_KEY, slots);
   }
-  el.slotLabel.value = "";
+  el.directWinnerName.value = "";
   await loadData();
 }
 
@@ -277,7 +278,7 @@ function render() {
 
 function renderBookingOptions(yearSlots) {
   const openSlots = yearSlots.filter(slot => slot.status !== "drawn");
-  el.bookingSlot.innerHTML = openSlots.map(slot => `<option value="${slot.id}">${escapeHtml(slot.label)} · ${formatDate(slot.start_date)} - ${formatDate(slot.end_date)}</option>`).join("");
+  el.bookingSlot.innerHTML = openSlots.map(slot => `<option value="${slot.id}">${escapeHtml(slotDateLabel(slot))}</option>`).join("");
 }
 
 function renderYear(slotDayMap, holidayMap) {
@@ -323,10 +324,9 @@ function slotCard(slot) {
     <article class="slot-card">
       <div class="slot-top">
         <div>
-          <div class="slot-title">${escapeHtml(slot.label)}</div>
-          <div class="slot-meta">${formatDate(slot.start_date)} - ${formatDate(slot.end_date)} · ${LOCK_DAYS} วันทำการ · ${slotBookings.length} คนจอง</div>
+          <div class="slot-title">${escapeHtml(slotDisplayTitle(slot))}</div>
+          <div class="slot-meta">${slotDateLabel(slot)} · ${LOCK_DAYS} วันทำการ · ${slotBookings.length} คนจอง</div>
           <div class="candidate-list">${candidates}</div>
-          ${slot.winner_name ? `<div class="winner">ผู้ได้ Loc: ${escapeHtml(slot.winner_name)}</div>` : ""}
         </div>
         <div class="actions">
           <button class="btn draw" type="button" data-draw="${slot.id}">จับฉลาก</button>
@@ -367,7 +367,7 @@ function renderSummary(yearSlots) {
 }
 
 function renderRecent(yearSlots) {
-  const rows = [...yearSlots].slice(-6).reverse().map(slot => `<div class="slot-card"><strong>${escapeHtml(slot.label)}</strong><span>${formatDate(slot.start_date)} - ${formatDate(slot.end_date)}</span></div>`);
+  const rows = [...yearSlots].slice(-6).reverse().map(slot => `<div class="slot-card"><strong>${escapeHtml(slotDisplayTitle(slot))}</strong><span>${slotDateLabel(slot)}</span></div>`);
   el.recentList.innerHTML = rows.join("") || `<div class="slot-card">ยังไม่มีรายการ</div>`;
 }
 
@@ -447,6 +447,13 @@ function overlapsFiscalYear(start, end) {
 
 function readLocal(key) { try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; } }
 function writeLocal(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+function defaultSlotLabel(start, end) { return `${formatShort(start)}-${formatShort(end)}`; }
+function slotDateLabel(slot) { return `${formatDate(slot.start_date)} - ${formatDate(slot.end_date)}`; }
+function slotDisplayTitle(slot) {
+  if (slot.winner_name) return `ผู้ได้ Loc: ${slot.winner_name}`;
+  const count = candidateCount(slot.id);
+  return count ? `รอจับฉลาก (${count} คนจอง)` : "ยังไม่มีผู้จอง";
+}
 function addBusinessDays(dateText, count) {
   const date = new Date(`${dateText}T00:00:00`);
   let added = 0;
