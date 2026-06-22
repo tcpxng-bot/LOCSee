@@ -115,6 +115,8 @@ button, input, select { font: inherit; }
 .tab.is-active, .btn.primary { background: var(--cream); }
 .btn.danger { background: #d9a0a0; }
 .btn.draw { background: var(--yellow); }
+.btn.small { min-height: 30px; padding: 0 10px; font-size: 15px; box-shadow: 0 3px 0 var(--shadow); }
+.btn.ghost { background: rgba(255,253,248,.72); border-width: 2px; color: var(--muted); }
 .input { width: 100%; padding: 0 12px; }
 
 .toolbar {
@@ -209,6 +211,16 @@ h2 { margin-bottom: 10px; }
 .has-slot { background: var(--blue); font-weight: 900; cursor: pointer; }
 .has-winner { background: var(--green); }
 .has-holiday { background: var(--yellow); }
+.search-hit {
+  position: relative;
+  z-index: 1;
+  outline: 4px solid #ff7aa8;
+  box-shadow: inset 0 0 0 2px white, 0 0 0 3px rgba(255,122,168,.28);
+}
+.search-muted {
+  opacity: .34;
+  filter: grayscale(.25);
+}
 .weekday-mini { font-size: 11px; font-weight: 700; }
 .cell-label {
   width: 100%;
@@ -222,6 +234,46 @@ h2 { margin-bottom: 10px; }
   text-overflow: ellipsis;
   font-size: 11px;
 }
+
+.day-details {
+  margin-top: 10px;
+  padding: 12px;
+  border-width: 3px;
+  display: grid;
+  gap: 8px;
+}
+
+.day-details > span,
+.detail-head span,
+.detail-row small,
+.holiday-item span {
+  color: var(--muted);
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.detail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.detail-row, .holiday-item {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 2px solid rgba(47,53,66,.22);
+  border-radius: 14px;
+  background: white;
+}
+
+.holiday-row { background: #fff7c7; }
 
 .grid.two {
   display: grid;
@@ -247,6 +299,48 @@ h2 { margin-bottom: 10px; }
   border: 3px solid var(--line);
   border-radius: 18px;
   background: var(--card);
+}
+
+.person-row.compact {
+  grid-template-columns: 34px minmax(90px, 1fr) auto minmax(160px, 1.6fr);
+  align-items: center;
+  padding: 8px 10px;
+  border-width: 2px;
+  border-radius: 14px;
+}
+
+.person-row.compact small {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank, .count-pill {
+  display: inline-grid;
+  place-items: center;
+  min-height: 28px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--cream);
+  font-weight: 900;
+}
+
+.count-pill {
+  padding: 0 10px;
+  background: var(--green);
+}
+
+.holiday-summary {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 2px dashed rgba(47,53,66,.28);
+}
+
+.holiday-item {
+  grid-template-columns: 1fr auto;
+  padding: 7px 9px;
 }
 
 .slot-top {
@@ -275,5 +369,6 @@ h2 { margin-bottom: 10px; }
 
 @media (max-width: 920px) {
   .tabs, .toolbar, .grid.two, .section-head, .manual-winner { grid-template-columns: 1fr; }
+  .detail-row, .person-row.compact, .holiday-item { grid-template-columns: 1fr; }
   .brand-logo { max-height: 118px; }
 }
