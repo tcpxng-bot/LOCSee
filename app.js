@@ -1,6 +1,7 @@
 const APP_PASSWORD = "locsee2570";
 const AUTH_KEY = "locsee.booking.auth";
 const YEAR_KEY = "locsee.booking.year";
+const THEME_KEY = "locsee.booking.theme";
 const LOCK_DAYS = 5;
 const VACATION_ALLOWANCE_DAYS = 10;
 const HOSPITAL_ALLOWANCE_DAYS = 5;
@@ -69,6 +70,7 @@ const el = {
   panels: document.querySelectorAll(".panel"),
   search: document.querySelector("#search"),
   fiscalYearSelect: document.querySelector("#fiscalYearSelect"),
+  themeSelect: document.querySelector("#themeSelect"),
   reloadBtn: document.querySelector("#reloadBtn"),
   yearOverview: document.querySelector("#yearOverview"),
   monthView: document.querySelector("#monthView"),
@@ -94,6 +96,7 @@ const el = {
 };
 
 populateFiscalYearSelect();
+applySavedTheme();
 syncDateBounds();
 
 el.loginForm.addEventListener("submit", event => {
@@ -111,6 +114,10 @@ el.tabButtons.forEach(button => button.addEventListener("click", () => setTab(bu
 el.search.addEventListener("input", render);
 el.logoutBtn.addEventListener("click", logoutApp);
 el.reloadBtn.addEventListener("click", loadData);
+el.themeSelect.addEventListener("change", () => {
+  applyTheme(el.themeSelect.value);
+  localStorage.setItem(THEME_KEY, el.themeSelect.value);
+});
 el.fiscalYearSelect.addEventListener("change", () => {
   selectedFiscalYear = Number(el.fiscalYearSelect.value);
   localStorage.setItem(YEAR_KEY, String(selectedFiscalYear));
@@ -143,6 +150,17 @@ function logoutApp() {
 function setTab(name) {
   el.tabButtons.forEach(button => button.classList.toggle("is-active", button.dataset.tab === name));
   el.panels.forEach(panel => panel.classList.toggle("is-active", panel.dataset.panel === name));
+}
+
+function applySavedTheme() {
+  const savedTheme = localStorage.getItem(THEME_KEY) || "soft";
+  applyTheme(savedTheme);
+  el.themeSelect.value = savedTheme;
+}
+
+function applyTheme(themeName) {
+  const allowedThemes = ["soft", "mint", "pink", "contrast"];
+  document.body.dataset.theme = allowedThemes.includes(themeName) ? themeName : "soft";
 }
 
 async function loadData() {
