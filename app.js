@@ -71,6 +71,7 @@ const el = {
   fiscalYearSelect: document.querySelector("#fiscalYearSelect"),
   reloadBtn: document.querySelector("#reloadBtn"),
   yearOverview: document.querySelector("#yearOverview"),
+  monthView: document.querySelector("#monthView"),
   dayDetails: document.querySelector("#dayDetails"),
   slotForm: document.querySelector("#slotForm"),
   slotStart: document.querySelector("#slotStart"),
@@ -363,6 +364,7 @@ function render() {
   el.note.textContent = `นับเฉพาะวันทำการ ไม่นับเสาร์-อาทิตย์ · สิทธิพื้นฐาน ${VACATION_ALLOWANCE_DAYS}+${HOSPITAL_ALLOWANCE_DAYS} = ${TOTAL_ALLOWANCE_DAYS} วันต่อคน · Loc หนึ่งจองได้หลายคน`;
   renderBookingOptions(yearSlots);
   renderYear(slotDayMap, holidayMap, query);
+  renderMonthView(0, slotDayMap, holidayMap);
   renderSearchDetails(query, filteredSlots, holidayMap);
   renderOpenSlots(filteredSlots);
   renderDrawList(filteredSlots);
@@ -384,7 +386,7 @@ function renderYear(slotDayMap, holidayMap, query = "") {
   for (let day = 1; day <= 31; day++) cells.push(`<div class="year-cell day-head">${day}</div>`);
   MONTHS.forEach((month, index) => {
     const lastDay = new Date(month.adYear, month.month, 0).getDate();
-    cells.push(`<div class="year-cell month-label" style="background:${monthColors[index]}">${thMonthFull[month.month - 1]} ${month.beYear}</div>`);
+    cells.push(`<button class="year-cell month-label month-link" type="button" data-month-index="${index}" style="background:${monthColors[index]}">${thMonthFull[month.month - 1]} ${month.beYear}</button>`);
     for (let day = 1; day <= 31; day++) {
       if (day > lastDay) { cells.push(`<div class="year-cell invalid"></div>`); continue; }
       const date = new Date(month.adYear, month.month - 1, day);
@@ -403,7 +405,46 @@ function renderYear(slotDayMap, holidayMap, query = "") {
     }
   });
   el.yearOverview.innerHTML = cells.join("");
+  el.yearOverview.querySelectorAll("[data-month-index]").forEach(button => {
+    button.addEventListener("click", () => {
+      renderMonthView(Number(button.dataset.monthIndex), slotDayMap, holidayMap);
+      el.monthView.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
   el.yearOverview.querySelectorAll("[data-detail-date]").forEach(button => {
+    button.addEventListener("click", () => showDayDetails(button.dataset.detailDate, slotDayMap, holidayMap));
+  });
+}
+
+function renderMonthView(monthIndex, slotDayMap, holidayMap) {
+  const month = MONTHS[monthIndex] || MONTHS[0];
+  const lastDay = new Date(month.adYear, month.month, 0).getDate();
+  const cells = [];
+  for (let day = 1; day <= lastDay; day++) {
+    const date = new Date(month.adYear, month.month - 1, day);
+    const key = iso(date);
+    const daySlots = slotDayMap.get(key) || [];
+    const holidays = holidayMap.get(key) || [];
+    const winners = uniqueNames(daySlots.flatMap(item => splitWinners(item.winner_name)));
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    const classes = ["month-day", isWeekend ? "weekend" : "", daySlots.length ? "has-slot" : "", winners.length ? "has-winner" : "", holidays.length ? "has-holiday" : ""].filter(Boolean).join(" ");
+    const label = winners.length ? winners.slice(0, 3).join(", ") : daySlots.length ? `จอง ${candidateCount(daySlots[0].id)} คน` : holidays.length ? displayNames(holidays.map(h => h.name)) : "";
+    cells.push(`
+      <button class="${classes}" type="button" ${daySlots.length || holidays.length ? `data-detail-date="${key}"` : ""}>
+        <strong>${day}</strong>
+        <span>${thDays[date.getDay()]}</span>
+        ${label ? `<small>${escapeHtml(label)}</small>` : ""}
+      </button>
+    `);
+  }
+  el.monthView.innerHTML = `
+    <div class="month-view-head">
+      <h2>${thMonthFull[month.month - 1]} ${month.beYear}</h2>
+      <span>มุมมองรายเดือน</span>
+    </div>
+    <div class="month-grid">${cells.join("")}</div>
+  `;
+  el.monthView.querySelectorAll("[data-detail-date]").forEach(button => {
     button.addEventListener("click", () => showDayDetails(button.dataset.detailDate, slotDayMap, holidayMap));
   });
 }
