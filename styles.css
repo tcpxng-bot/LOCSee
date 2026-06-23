@@ -216,6 +216,14 @@ h2 { margin-bottom: 10px; }
   font-weight: 900;
 }
 
+.month-link {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.month-link:hover { filter: brightness(.96); }
+
 .day-head { background: #bde8f5; font-weight: 900; }
 .invalid { background: #f1eadc; color: transparent; opacity: .55; }
 .has-slot { background: var(--blue); font-weight: 900; cursor: pointer; }
@@ -261,6 +269,64 @@ h2 { margin-bottom: 10px; }
   border-width: 3px;
   display: grid;
   gap: 8px;
+}
+
+.month-view {
+  margin-top: 10px;
+  padding: 12px;
+  border-width: 3px;
+}
+
+.month-view-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.month-view-head h2 { margin-bottom: 0; }
+.month-view-head span { color: var(--muted); }
+
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.month-day {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-content: start;
+  gap: 2px 6px;
+  padding: 8px;
+  border: 2px solid rgba(47,53,66,.28);
+  border-radius: 14px;
+  background: white;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.month-day strong { font-size: 20px; line-height: 1; }
+.month-day span { color: var(--muted); font-weight: 900; }
+.month-day small {
+  grid-column: 1 / -1;
+  font-size: 15px;
+  line-height: 1.08;
+}
+
+.month-day.weekend { background: var(--orange); }
+.month-day.has-slot { background: var(--blue); }
+.month-day.has-winner { background: var(--green); }
+.month-day.has-holiday { background: var(--yellow); }
+.month-day.weekend.has-slot,
+.month-day.weekend.has-winner,
+.month-day.weekend.has-holiday {
+  background:
+    repeating-linear-gradient(135deg, rgba(201,143,98,.82) 0 8px, rgba(201,143,98,.42) 8px 13px),
+    var(--orange);
 }
 
 .day-details > span,
@@ -408,5 +474,10 @@ h2 { margin-bottom: 10px; }
 @media (max-width: 920px) {
   .tabs, .toolbar, .grid.two, .section-head, .manual-winner { grid-template-columns: 1fr; }
   .detail-row, .person-row.compact, .holiday-item { grid-template-columns: 1fr; }
+  .month-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .brand-logo { max-height: 118px; }
+}
+
+@media (min-width: 700px) and (max-width: 920px) {
+  .month-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
