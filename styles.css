@@ -195,7 +195,7 @@ h2 { margin-bottom: 10px; }
 }
 
 .year-cell {
-  min-height: 34px;
+  min-height: 42px;
   border: 0;
   border-radius: 6px;
   background: white;
@@ -217,11 +217,18 @@ h2 { margin-bottom: 10px; }
 }
 
 .day-head { background: #bde8f5; font-weight: 900; }
-.weekend { background: var(--orange); }
 .invalid { background: #f1eadc; color: transparent; opacity: .55; }
 .has-slot { background: var(--blue); font-weight: 900; cursor: pointer; }
 .has-winner { background: var(--green); }
 .has-holiday { background: var(--yellow); }
+.year-cell.weekend { background: var(--orange); }
+.year-cell.weekend.has-slot,
+.year-cell.weekend.has-winner,
+.year-cell.weekend.has-holiday {
+  background:
+    repeating-linear-gradient(135deg, rgba(201,143,98,.95) 0 7px, rgba(201,143,98,.52) 7px 12px),
+    var(--orange);
+}
 .search-hit {
   position: relative;
   z-index: 1;
@@ -240,10 +247,12 @@ h2 { margin-bottom: 10px; }
   border: 2px solid rgba(47,53,66,.35);
   border-radius: 8px;
   background: rgba(255,255,255,.72);
-  white-space: nowrap;
+  white-space: pre-line;
   overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 11px;
+  text-overflow: clip;
+  font-size: 10px;
+  line-height: 1.05;
+  max-height: 24px;
 }
 
 .day-details {
