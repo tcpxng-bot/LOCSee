@@ -64,9 +64,11 @@
           <h2>สร้าง Loc ใหม่</h2>
           <label>วันเริ่ม Loc</label>
           <input class="input" id="slotStart" type="date" required>
-          <label>ผู้ได้ Loc Vacation</label>
-          <input class="input" id="directWinnerName" placeholder="ใส่ชื่อถ้ารู้ผู้ได้ Loc แล้ว">
-          <p class="hint">ใส่ชื่อผู้ได้ Loc ได้ทันที หรือเว้นว่างไว้เพื่อเปิดให้จอง/จับฉลากภายหลัง · 1 Loc = จันทร์-ศุกร์</p>
+          <label>จำนวนวันลา</label>
+          <input class="input" id="slotLeaveDays" type="number" min="1" max="5" value="5">
+          <label>รายชื่อเข้าจับฉลาก</label>
+          <textarea class="input textarea" id="directWinnerName" placeholder="ใส่ชื่อผู้จอง เช่น รัชพร, แสงดาว"></textarea>
+          <p class="hint">ใส่หลายชื่อได้โดยคั่นด้วย comma หรือขึ้นบรรทัดใหม่ ระบบจะรวมเป็น Loc เดียวแล้วนำไปจับฉลาก · 1 Loc = จันทร์-ศุกร์</p>
           <button class="btn primary" type="submit">บันทึก Loc</button>
         </form>
 
@@ -76,6 +78,8 @@
           <select class="input" id="bookingSlot"></select>
           <label>หรือเลือกวันเริ่ม Loc</label>
           <input class="input" id="bookingStart" type="date">
+          <label>จำนวนวันลา ถ้าสร้าง Loc ใหม่</label>
+          <input class="input" id="bookingLeaveDays" type="number" min="1" max="5" value="5">
           <p class="hint">เลือกวันจันทร์ที่ต้องการจอง ระบบจะนับเป็นช่วงจันทร์-ศุกร์ให้อัตโนมัติ</p>
           <label>ชื่อผู้จอง</label>
           <input class="input" id="bookingName" placeholder="เช่น พี่แป้ง" required>
