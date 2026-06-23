@@ -434,7 +434,7 @@ function renderYear(slotDayMap, holidayMap, query = "") {
       const hasInfo = daySlots.length || holidays.length;
       const isHit = query && (daySlots.some(slot => slotMatchesQuery(slot, query)) || holidays.some(item => holidayMatchesQuery(item, query)));
       const isMuted = query && hasInfo && !isHit;
-      const classes = ["year-cell", isWeekend ? "weekend" : "", daySlots.length ? "has-slot" : "", winner ? "has-winner" : "", holidays.length ? "has-holiday" : "", isHit ? "search-hit" : "", isMuted ? "search-muted" : ""].filter(Boolean).join(" ");
+      const classes = ["year-cell", isWeekend ? "weekend" : "", daySlots.length ? "has-slot" : "", winner.length ? "has-winner" : "", holidays.length ? "has-holiday" : "", isHit ? "search-hit" : "", isMuted ? "search-muted" : ""].filter(Boolean).join(" ");
       const label = winner.length ? winner.slice(0, 2).join("\n") : daySlots.length ? `จอง ${candidateCount(daySlots[0].id)} คน` : holidays.length ? `หยุด ${displayNames(holidays.map(h => h.name))}` : "";
       const dateAttr = daySlots.length || holidays.length ? ` data-detail-date="${key}"` : "";
       cells.push(`<button class="${classes}" type="button"${dateAttr}><span class="weekday-mini">${thDays[date.getDay()]}</span>${label ? `<span class="cell-label">${escapeHtml(label)}</span>` : ""}</button>`);
