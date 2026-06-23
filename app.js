@@ -392,7 +392,7 @@ function renderYear(slotDayMap, holidayMap, query = "") {
       const daySlots = slotDayMap.get(key) || [];
       const holidays = holidayMap.get(key) || [];
       const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-      const winner = splitWinners(daySlots.find(item => item.winner_name)?.winner_name || "");
+      const winner = uniqueNames(daySlots.flatMap(item => splitWinners(item.winner_name)));
       const hasInfo = daySlots.length || holidays.length;
       const isHit = query && (daySlots.some(slot => slotMatchesQuery(slot, query)) || holidays.some(item => holidayMatchesQuery(item, query)));
       const isMuted = query && hasInfo && !isHit;
