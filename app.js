@@ -1,672 +1,129 @@
-const APP_PASSWORD = "locsee2570";
-const AUTH_KEY = "locsee.booking.auth";
-const YEAR_KEY = "locsee.booking.year";
-const LOCK_DAYS = 5;
-const VAC_KEY = "locsee.booking.slots";
-const BOOKING_KEY = "locsee.booking.bookings";
-const HOLIDAY_KEY = "locsee.booking.holidays";
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LOCSee Booking</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <section class="login-gate" id="loginGate">
+    <form class="login-card card" id="loginForm">
+      <img class="login-logo" src="./assets/locsee-logo.png" alt="LOCSee">
+      <h1>เข้าสู่ LOCSee</h1>
+      <p>ใส่รหัสของวอร์ดเพื่อเปิดระบบจอง Loc Vacation</p>
+      <input class="input" id="passwordInput" type="password" placeholder="รหัสผ่าน">
+      <button class="btn primary" type="submit">เข้าสู่ระบบ</button>
+      <small id="loginMessage"></small>
+    </form>
+  </section>
 
-const thMonthFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-const thDays = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-const monthColors = ["#a9cbd3", "#b8c7d9", "#b8d2bd", "#c8d7ad", "#e7dda5", "#e6ccb1", "#ddbea8", "#d8b293", "#d9aaa0", "#d8b7c1", "#cdb9cd", "#c4b5a8"];
-const longDate = new Intl.DateTimeFormat("th-TH-u-ca-buddhist", { day: "numeric", month: "long", year: "numeric" });
+  <main class="app is-locked" id="appShell">
+    <header class="hero card">
+      <img class="brand-logo" src="./assets/locsee-logo.png" alt="LOCSee">
+      <p class="status" id="statusText">กำลังโหลดข้อมูล...</p>
+      <button class="btn small ghost" id="logoutBtn" type="button">ออกจากระบบ</button>
+    </header>
 
-const BASE_HOLIDAYS = [
-  ["2026-10-13", "วันหยุดพิเศษ"],
-  ["2027-01-01", "วันหยุดพิเศษ"],
-  ["2027-02-22", "วันหยุดพิเศษ"],
-  ["2027-03-03", "วันหยุดพิเศษ"],
-  ["2027-04-06", "วันหยุดพิเศษ"],
-  ["2027-04-13", "วันหยุดพิเศษ"],
-  ["2027-04-14", "วันหยุดพิเศษ"],
-  ["2027-04-15", "วันหยุดพิเศษ"],
-  ["2027-05-01", "วันหยุดพิเศษ"],
-  ["2027-05-03", "วันหยุดพิเศษ"],
-  ["2027-05-20", "วันหยุดพิเศษ"],
-  ["2027-06-03", "วันหยุดพิเศษ"],
-  ["2027-07-19", "วันหยุดพิเศษ"],
-  ["2027-07-28", "วันหยุดพิเศษ"]
-];
+    <nav class="tabs card">
+      <button class="tab is-active" type="button" data-tab="overview">ภาพรวมทั้งปี</button>
+      <button class="tab" type="button" data-tab="booking">จอง Loc</button>
+      <button class="tab" type="button" data-tab="draw">จับฉลาก/จัดการ</button>
+      <button class="tab" type="button" data-tab="summary">สรุป</button>
+    </nav>
 
-const cfg = window.LOCVAC_SUPABASE || {};
-const supabaseUrl = normalizeSupabaseUrl(cfg.url);
-const supabaseAnonKey = String(cfg.anonKey || "").trim();
-const hasSupabase = Boolean(supabaseUrl && supabaseAnonKey && window.supabase);
-const db = hasSupabase ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null;
+    <section class="toolbar">
+      <input class="input" id="search" type="search" placeholder="ค้นหาชื่อ / วันที่">
+      <select class="input" id="fiscalYearSelect"></select>
+      <button class="btn" id="reloadBtn" type="button">รีเฟรช</button>
+    </section>
 
-let selectedFiscalYear = Number(localStorage.getItem(YEAR_KEY) || "2570");
-let MONTHS = buildFiscalMonths(selectedFiscalYear);
-let selectedIndex = 0;
-let minDate = "";
-let maxDate = "";
-let slots = [];
-let bookings = [];
-let customHolidays = [];
-
-function normalizeSupabaseUrl(rawUrl) {
-  const value = String(rawUrl || "").trim();
-  if (!value) return "";
-  try {
-    const url = new URL(value);
-    return `${url.protocol}//${url.host}`;
-  } catch (error) {
-    return value.replace(/\/rest\/v1\/?$/i, "").replace(/\/+$/, "");
-  }
-}
-
-const el = {
-  loginGate: document.querySelector("#loginGate"),
-  appShell: document.querySelector("#appShell"),
-  loginForm: document.querySelector("#loginForm"),
-  passwordInput: document.querySelector("#passwordInput"),
-  loginMessage: document.querySelector("#loginMessage"),
-  statusText: document.querySelector("#statusText"),
-  logoutBtn: document.querySelector("#logoutBtn"),
-  tabButtons: document.querySelectorAll(".tab"),
-  panels: document.querySelectorAll(".panel"),
-  search: document.querySelector("#search"),
-  fiscalYearSelect: document.querySelector("#fiscalYearSelect"),
-  reloadBtn: document.querySelector("#reloadBtn"),
-  yearOverview: document.querySelector("#yearOverview"),
-  dayDetails: document.querySelector("#dayDetails"),
-  slotForm: document.querySelector("#slotForm"),
-  slotStart: document.querySelector("#slotStart"),
-  directWinnerName: document.querySelector("#directWinnerName"),
-  bookingForm: document.querySelector("#bookingForm"),
-  bookingSlot: document.querySelector("#bookingSlot"),
-  bookingStart: document.querySelector("#bookingStart"),
-  bookingName: document.querySelector("#bookingName"),
-  openSlotList: document.querySelector("#openSlotList"),
-  drawList: document.querySelector("#drawList"),
-  winnerSummary: document.querySelector("#winnerSummary"),
-  recentList: document.querySelector("#recentList"),
-  holidayForm: document.querySelector("#holidayForm"),
-  holidaySummary: document.querySelector("#holidaySummary"),
-  holidayName: document.querySelector("#holidayName"),
-  holidayDate: document.querySelector("#holidayDate"),
-  note: document.querySelector("#note")
-};
-
-populateFiscalYearSelect();
-syncDateBounds();
-
-el.loginForm.addEventListener("submit", event => {
-  event.preventDefault();
-  if (el.passwordInput.value === APP_PASSWORD) {
-    sessionStorage.setItem(AUTH_KEY, "1");
-    unlockApp();
-  } else {
-    el.loginMessage.textContent = "รหัสผ่านไม่ถูกต้อง";
-    el.passwordInput.select();
-  }
-});
-
-el.tabButtons.forEach(button => button.addEventListener("click", () => setTab(button.dataset.tab)));
-el.search.addEventListener("input", render);
-el.logoutBtn.addEventListener("click", logoutApp);
-el.reloadBtn.addEventListener("click", loadData);
-el.fiscalYearSelect.addEventListener("change", () => {
-  selectedFiscalYear = Number(el.fiscalYearSelect.value);
-  localStorage.setItem(YEAR_KEY, String(selectedFiscalYear));
-  MONTHS = buildFiscalMonths(selectedFiscalYear);
-  syncDateBounds();
-  render();
-});
-el.slotForm.addEventListener("submit", createSlot);
-el.bookingForm.addEventListener("submit", createBooking);
-el.holidayForm.addEventListener("submit", createHoliday);
-
-if (sessionStorage.getItem(AUTH_KEY) === "1") unlockApp();
-else el.passwordInput.focus();
-
-function unlockApp() {
-  el.loginGate.classList.add("is-unlocked");
-  el.appShell.classList.remove("is-locked");
-  loadData();
-}
-
-function logoutApp() {
-  sessionStorage.removeItem(AUTH_KEY);
-  el.passwordInput.value = "";
-  el.loginMessage.textContent = "";
-  el.loginGate.classList.remove("is-unlocked");
-  el.appShell.classList.add("is-locked");
-  el.passwordInput.focus();
-}
-
-function setTab(name) {
-  el.tabButtons.forEach(button => button.classList.toggle("is-active", button.dataset.tab === name));
-  el.panels.forEach(panel => panel.classList.toggle("is-active", panel.dataset.panel === name));
-}
-
-async function loadData() {
-  try {
-    if (hasSupabase) {
-      const [slotRes, bookingRes, holidayRes] = await Promise.all([
-        db.from("loc_slots").select("*").order("start_date", { ascending: true }),
-        db.from("loc_bookings").select("*").order("created_at", { ascending: true }),
-        db.from("special_holidays").select("*").order("holiday_date", { ascending: true })
-      ]);
-      if (slotRes.error) throw slotRes.error;
-      if (bookingRes.error) throw bookingRes.error;
-      if (holidayRes.error) throw holidayRes.error;
-      slots = slotRes.data || [];
-      bookings = bookingRes.data || [];
-      customHolidays = holidayRes.data || [];
-    } else {
-      slots = readLocal(VAC_KEY);
-      bookings = readLocal(BOOKING_KEY);
-      customHolidays = readLocal(HOLIDAY_KEY);
-    }
-    render();
-  } catch (error) {
-    el.statusText.textContent = `โหลดข้อมูลไม่สำเร็จ: ${error.message}`;
-  }
-}
-
-async function createSlot(event) {
-  event.preventDefault();
-  const start = el.slotStart.value;
-  if (!start) return;
-  if (!validateMonday(start, el.slotStart)) return;
-  const end = addBusinessDays(start, LOCK_DAYS);
-  const directWinner = el.directWinnerName.value.trim();
-  const item = {
-    label: defaultSlotLabel(start, end),
-    start_date: start,
-    end_date: end,
-    winner_name: directWinner || null,
-    status: directWinner ? "drawn" : "open"
-  };
-  const saved = await saveSlot(item);
-  if (!saved) return;
-  el.directWinnerName.value = "";
-  await loadData();
-}
-
-async function createBooking(event) {
-  event.preventDefault();
-  const personName = el.bookingName.value.trim();
-  if (!personName) return;
-  const slotId = await resolveBookingSlotId();
-  if (!slotId) return;
-  const item = {
-    slot_id: slotId,
-    person_name: personName
-  };
-  if (hasSupabase) {
-    const { error } = await db.from("loc_bookings").insert(item);
-    if (error) return alert(error.message);
-  } else {
-    bookings.push({ id: crypto.randomUUID(), created_at: new Date().toISOString(), ...item });
-    writeLocal(BOOKING_KEY, bookings);
-  }
-  el.bookingName.value = "";
-  el.bookingStart.value = "";
-  await loadData();
-}
-
-async function resolveBookingSlotId() {
-  if (el.bookingSlot.value) return el.bookingSlot.value;
-  const start = el.bookingStart.value;
-  if (!start) {
-    alert("กรุณาเลือก Loc ที่เปิดไว้ หรือเลือกวันเริ่ม Loc ที่ต้องการจอง");
-    el.bookingStart.focus();
-    return "";
-  }
-  if (!validateMonday(start, el.bookingStart)) return "";
-  const end = addBusinessDays(start, LOCK_DAYS);
-  const existing = slots.find(slot => slot.start_date === start && slot.end_date === end && slot.status !== "drawn");
-  if (existing) return existing.id;
-  const saved = await saveSlot({
-    label: defaultSlotLabel(start, end),
-    start_date: start,
-    end_date: end,
-    winner_name: null,
-    status: "open"
-  });
-  return saved?.id || "";
-}
-
-async function saveSlot(item) {
-  if (hasSupabase) {
-    const { data, error } = await db.from("loc_slots").insert(item).select("id").single();
-    if (error) {
-      alert(error.message);
-      return null;
-    }
-    return { id: data.id, ...item };
-  }
-  const saved = { id: crypto.randomUUID(), created_at: new Date().toISOString(), ...item };
-  slots.push(saved);
-  writeLocal(VAC_KEY, slots);
-  return saved;
-}
-
-async function createHoliday(event) {
-  event.preventDefault();
-  const item = { name: el.holidayName.value.trim(), holiday_date: el.holidayDate.value };
-  if (!item.name || !item.holiday_date) return;
-  if (hasSupabase) {
-    const { error } = await db.from("special_holidays").insert(item);
-    if (error) return alert(error.message);
-  } else {
-    customHolidays.push({ id: crypto.randomUUID(), created_at: new Date().toISOString(), ...item });
-    writeLocal(HOLIDAY_KEY, customHolidays);
-  }
-  el.holidayName.value = "";
-  await loadData();
-}
-
-async function drawSlot(slotId) {
-  const slotBookings = bookings.filter(item => item.slot_id === slotId);
-  if (!slotBookings.length) return alert("ยังไม่มีคนจอง Loc นี้");
-  const winner = slotBookings[Math.floor(Math.random() * slotBookings.length)].person_name;
-  await setWinner(slotId, winner);
-}
-
-async function chooseWinner(slotId, winner) {
-  if (!winner) return alert("กรุณาเลือกชื่อผู้ได้ Loc");
-  await setWinner(slotId, winner);
-}
-
-async function setWinner(slotId, winner) {
-  if (hasSupabase) {
-    const { error } = await db.from("loc_slots").update({ winner_name: winner, status: "drawn" }).eq("id", slotId);
-    if (error) return alert(error.message);
-  } else {
-    slots = slots.map(slot => slot.id === slotId ? { ...slot, winner_name: winner, status: "drawn" } : slot);
-    writeLocal(VAC_KEY, slots);
-  }
-  await loadData();
-}
-
-async function deleteItem(type, id) {
-  if (!confirm("ลบรายการนี้?")) return;
-  if (hasSupabase) {
-    const table = type === "slot" ? "loc_slots" : type === "booking" ? "loc_bookings" : "special_holidays";
-    const { error } = await db.from(table).delete().eq("id", id);
-    if (error) return alert(error.message);
-  } else if (type === "slot") {
-    slots = slots.filter(item => item.id !== id);
-    bookings = bookings.filter(item => item.slot_id !== id);
-    writeLocal(VAC_KEY, slots); writeLocal(BOOKING_KEY, bookings);
-  } else if (type === "booking") {
-    bookings = bookings.filter(item => item.id !== id);
-    writeLocal(BOOKING_KEY, bookings);
-  } else {
-    customHolidays = customHolidays.filter(item => item.id !== id);
-    writeLocal(HOLIDAY_KEY, customHolidays);
-  }
-  await loadData();
-}
-
-function render() {
-  const yearSlots = slots.filter(slot => overlapsFiscalYear(slot.start_date, slot.end_date));
-  const slotDays = expandSlots(yearSlots);
-  const slotDayMap = groupByDate(slotDays);
-  const holidayMap = groupHolidays();
-  const query = el.search.value.trim().toLowerCase();
-  const filteredSlots = yearSlots.filter(slot => slotMatchesQuery(slot, query));
-  const bookingCount = bookings.filter(item => yearSlots.some(slot => slot.id === item.slot_id)).length;
-  el.statusText.textContent = `${hasSupabase ? "ออนไลน์/Supabase" : "ทดลองในเครื่อง/localStorage"} · ปี ${selectedFiscalYear} · Loc ${yearSlots.length} รายการ · ผู้จอง ${bookingCount} รายชื่อ`;
-  el.note.textContent = `1 Loc = ${LOCK_DAYS} วันทำการ ไม่นับเสาร์-อาทิตย์ · Loc หนึ่งจองได้หลายคน แล้วจับฉลากหรือเลือกผู้ได้ Loc เอง`;
-  renderBookingOptions(yearSlots);
-  renderYear(slotDayMap, holidayMap, query);
-  renderSearchDetails(query, filteredSlots, holidayMap);
-  renderOpenSlots(filteredSlots);
-  renderDrawList(filteredSlots);
-  renderSummary(yearSlots);
-  renderHolidaySummary();
-  renderRecent(yearSlots);
-}
-
-function renderBookingOptions(yearSlots) {
-  const openSlots = yearSlots.filter(slot => slot.status !== "drawn");
-  el.bookingSlot.innerHTML = [
-    `<option value="">เลือกจาก Loc ที่เปิดไว้ หรือเลือกวันเริ่มด้านล่าง</option>`,
-    ...openSlots.map(slot => `<option value="${slot.id}">${escapeHtml(slotDateLabel(slot))}</option>`)
-  ].join("");
-}
-
-function renderYear(slotDayMap, holidayMap, query = "") {
-  const cells = [`<div class="year-cell day-head">เดือน</div>`];
-  for (let day = 1; day <= 31; day++) cells.push(`<div class="year-cell day-head">${day}</div>`);
-  MONTHS.forEach((month, index) => {
-    const lastDay = new Date(month.adYear, month.month, 0).getDate();
-    cells.push(`<div class="year-cell month-label" style="background:${monthColors[index]}">${thMonthFull[month.month - 1]} ${month.beYear}</div>`);
-    for (let day = 1; day <= 31; day++) {
-      if (day > lastDay) { cells.push(`<div class="year-cell invalid"></div>`); continue; }
-      const date = new Date(month.adYear, month.month - 1, day);
-      const key = iso(date);
-      const daySlots = slotDayMap.get(key) || [];
-      const holidays = holidayMap.get(key) || [];
-      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-      const winner = daySlots.find(item => item.winner_name)?.winner_name;
-      const hasInfo = daySlots.length || holidays.length;
-      const isHit = query && (daySlots.some(slot => slotMatchesQuery(slot, query)) || holidays.some(item => holidayMatchesQuery(item, query)));
-      const isMuted = query && hasInfo && !isHit;
-      const classes = ["year-cell", isWeekend ? "weekend" : "", daySlots.length ? "has-slot" : "", winner ? "has-winner" : "", holidays.length ? "has-holiday" : "", isHit ? "search-hit" : "", isMuted ? "search-muted" : ""].filter(Boolean).join(" ");
-      const label = winner ? winner : daySlots.length ? `จอง ${candidateCount(daySlots[0].id)} คน` : holidays.length ? `หยุด ${displayNames(holidays.map(h => h.name))}` : "";
-      const dateAttr = daySlots.length || holidays.length ? ` data-detail-date="${key}"` : "";
-      cells.push(`<button class="${classes}" type="button"${dateAttr}><span class="weekday-mini">${thDays[date.getDay()]}</span>${label ? `<span class="cell-label">${escapeHtml(label)}</span>` : ""}</button>`);
-    }
-  });
-  el.yearOverview.innerHTML = cells.join("");
-  el.yearOverview.querySelectorAll("[data-detail-date]").forEach(button => {
-    button.addEventListener("click", () => showDayDetails(button.dataset.detailDate, slotDayMap, holidayMap));
-  });
-}
-
-function renderSearchDetails(query, matchedSlots, holidayMap) {
-  if (!query) {
-    el.dayDetails.innerHTML = `
-      <strong>กดช่องในตารางเพื่อดูรายละเอียด</strong>
-      <span>หรือพิมพ์ชื่อ / วันที่ในช่องค้นหาเพื่อไฮไลต์รายการบนตาราง</span>
-    `;
-    return;
-  }
-  const matchedHolidays = [...holidayMap.values()].flat().filter(item => holidayMatchesQuery(item, query));
-  const slotRows = matchedSlots.map(slot => {
-    const slotBookings = bookings.filter(item => item.slot_id === slot.id).map(item => item.person_name);
-    const status = slot.winner_name ? `ผู้ได้ Loc: ${slot.winner_name}` : `รอจับฉลาก (${slotBookings.length} คนจอง)`;
-    const bookButton = slot.status !== "drawn" ? `<button class="btn small" type="button" data-book-slot="${slot.id}">จองรอบนี้</button>` : "";
-    return `
-      <div class="detail-row">
-        <strong>${escapeHtml(status)}</strong>
-        <span>${slotDateLabel(slot)}</span>
-        <small>ผู้จอง: ${escapeHtml(slotBookings.join(", ") || "ยังไม่มี")}</small>
-        ${bookButton}
+    <section class="panel is-active" data-panel="overview">
+      <div class="section-head">
+        <h2>ภาพรวมทั้งปี</h2>
+        <p>Loc ที่ยังไม่จับฉลากจะแสดงจำนวนผู้จอง ถ้าจับแล้วจะแสดงชื่อผู้ได้ Loc</p>
       </div>
-    `;
-  }).join("");
-  const holidayRows = matchedHolidays.map(item => `
-    <div class="detail-row holiday-row">
-      <strong>วันหยุดพิเศษ</strong>
-      <span>${escapeHtml(item.name)}</span>
-      <small>${formatDate(item.holiday_date)}</small>
-    </div>
-  `).join("");
-  const total = matchedSlots.length + matchedHolidays.length;
-  el.dayDetails.innerHTML = `
-    <div class="detail-head">
-      <strong>ผลค้นหา: ${escapeHtml(query)}</strong>
-      <span>${total ? `${total} รายการ` : "ไม่พบรายการ"}</span>
-    </div>
-    <div class="detail-list">${slotRows}${holidayRows || ""}</div>
-  `;
-  if (!total) el.dayDetails.querySelector(".detail-list").innerHTML = `<div class="detail-row"><strong>ไม่พบข้อมูลที่ตรงกัน</strong><span>ลองค้นด้วยชื่อเล่นหรือวันที่ เช่น 12/01/2570</span></div>`;
-  el.dayDetails.querySelectorAll("[data-book-slot]").forEach(button => {
-    button.addEventListener("click", () => selectSlotForBooking(button.dataset.bookSlot));
-  });
-}
-
-function showDayDetails(dateText, slotDayMap, holidayMap) {
-  const daySlots = slotDayMap.get(dateText) || [];
-  const holidays = holidayMap.get(dateText) || [];
-  const slotRows = daySlots.map(slot => {
-    const slotBookings = bookings.filter(item => item.slot_id === slot.id).map(item => item.person_name);
-    const status = slot.winner_name ? `ผู้ได้ Loc: ${slot.winner_name}` : `รอจับฉลาก (${slotBookings.length} คนจอง)`;
-    const bookButton = slot.status !== "drawn" ? `<button class="btn small" type="button" data-book-slot="${slot.id}">จองรอบนี้</button>` : "";
-    return `
-      <div class="detail-row">
-        <strong>${escapeHtml(status)}</strong>
-        <span>${slotDateLabel(slot)}</span>
-        <small>ผู้จอง: ${escapeHtml(slotBookings.join(", ") || "ยังไม่มี")}</small>
-        ${bookButton}
+      <div class="legend">
+        <span><i class="swatch loc"></i>Loc เปิดจอง</span>
+        <span><i class="swatch won"></i>จับแล้ว</span>
+        <span><i class="swatch holiday"></i>วันหยุดพิเศษ</span>
+        <span><i class="swatch weekend"></i>เสาร์-อาทิตย์</span>
       </div>
-    `;
-  }).join("");
-  const holidayRows = holidays.map(item => `
-    <div class="detail-row holiday-row">
-      <strong>วันหยุดพิเศษ</strong>
-      <span>${escapeHtml(item.name)}</span>
-    </div>
-  `).join("");
-  el.dayDetails.innerHTML = `
-    <div class="detail-head">
-      <strong>${formatDate(dateText)}</strong>
-      <span>${daySlots.length ? `${daySlots.length} Loc` : ""}${daySlots.length && holidays.length ? " · " : ""}${holidays.length ? `${holidays.length} วันหยุด` : ""}</span>
-    </div>
-    <div class="detail-list">${slotRows}${holidayRows}</div>
-  `;
-  el.dayDetails.querySelectorAll("[data-book-slot]").forEach(button => {
-    button.addEventListener("click", () => selectSlotForBooking(button.dataset.bookSlot));
-  });
-}
-
-function selectSlotForBooking(slotId) {
-  setTab("booking");
-  el.bookingSlot.value = slotId;
-  el.bookingStart.value = "";
-  el.bookingName.focus();
-}
-
-function renderOpenSlots(items) {
-  el.openSlotList.innerHTML = items.length ? items.map(slotCard).join("") : `<div class="card slot-card">ยังไม่มี Loc ที่เปิดจองในปีนี้</div>`;
-  bindSlotActions(el.openSlotList);
-}
-
-function renderDrawList(items) {
-  el.drawList.innerHTML = items.length ? items.map(slotCard).join("") : `<div class="card slot-card">ยังไม่มี Loc สำหรับจับฉลาก</div>`;
-  bindSlotActions(el.drawList);
-}
-
-function slotCard(slot) {
-  const slotBookings = bookings.filter(item => item.slot_id === slot.id);
-  const candidates = slotBookings.map(item => escapeHtml(item.person_name)).join(", ") || "ยังไม่มีผู้จอง";
-  const winnerOptions = slotBookings.map(item => {
-    const selected = item.person_name === slot.winner_name ? "selected" : "";
-    return `<option value="${escapeHtml(item.person_name)}" ${selected}>${escapeHtml(item.person_name)}</option>`;
-  }).join("");
-  return `
-    <article class="slot-card">
-      <div class="slot-top">
-        <div>
-          <div class="slot-title">${escapeHtml(slotDisplayTitle(slot))}</div>
-          <div class="slot-meta">${slotDateLabel(slot)} · ${LOCK_DAYS} วันทำการ · ${slotBookings.length} คนจอง</div>
-          <div class="candidate-list">${candidates}</div>
-        </div>
-        <div class="actions">
-          <button class="btn draw" type="button" data-draw="${slot.id}">จับฉลาก</button>
-          <button class="btn danger" type="button" data-delete-slot="${slot.id}">ลบ Loc</button>
-        </div>
+      <div class="year-scroll card">
+        <div class="year-table" id="yearOverview"></div>
       </div>
-      ${slotBookings.length ? `
-        <div class="manual-winner">
-          <select class="input compact-input" data-winner-select="${slot.id}">
-            <option value="">เลือกผู้ได้ Loc เอง</option>
-            ${winnerOptions}
-          </select>
-          <button class="btn" type="button" data-choose-winner="${slot.id}">บันทึกผู้ได้</button>
-        </div>
-      ` : ""}
-    </article>
-  `;
-}
-
-function bindSlotActions(root) {
-  root.querySelectorAll("[data-draw]").forEach(btn => btn.addEventListener("click", () => drawSlot(btn.dataset.draw)));
-  root.querySelectorAll("[data-choose-winner]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const select = root.querySelector(`[data-winner-select="${CSS.escape(btn.dataset.chooseWinner)}"]`);
-      chooseWinner(btn.dataset.chooseWinner, select?.value || "");
-    });
-  });
-  root.querySelectorAll("[data-delete-slot]").forEach(btn => btn.addEventListener("click", () => deleteItem("slot", btn.dataset.deleteSlot)));
-}
-
-function renderSummary(yearSlots) {
-  const groups = new Map();
-  yearSlots.filter(slot => slot.winner_name).forEach(slot => {
-    if (!groups.has(slot.winner_name)) groups.set(slot.winner_name, []);
-    groups.get(slot.winner_name).push(slot);
-  });
-  const rows = [...groups.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "th"));
-  el.winnerSummary.innerHTML = rows.length
-    ? rows.map(([name, personSlots], index) => `
-      <div class="person-row compact">
-        <span class="rank">${index + 1}</span>
-        <strong>${escapeHtml(name)}</strong>
-        <span class="count-pill">${personSlots.length} ล็อค</span>
-        <small>${escapeHtml(personSlots.map(slot => `${formatShort(slot.start_date)}-${formatShort(slot.end_date)}`).join(", "))}</small>
+      <div class="day-details card" id="dayDetails">
+        <strong>กดช่องในตารางเพื่อดูรายละเอียด</strong>
+        <span>ถ้ามี Loc เปิดจองหรือมีผู้ได้ Loc รายละเอียดจะแสดงตรงนี้</span>
       </div>
-    `).join("")
-    : `<div class="slot-card">ยังไม่มีผลจับฉลาก</div>`;
-}
+    </section>
 
-function renderHolidaySummary() {
-  const holidayMap = groupHolidays();
-  const rows = [...holidayMap.values()].flat().sort((a, b) => a.holiday_date.localeCompare(b.holiday_date));
-  el.holidaySummary.innerHTML = rows.length
-    ? rows.map(item => `
-      <div class="holiday-item">
-        <strong>${escapeHtml(item.name)}</strong>
-        <span>${formatDate(item.holiday_date)}</span>
+    <section class="panel" data-panel="booking">
+      <div class="grid two">
+        <form class="card form" id="slotForm">
+          <h2>สร้าง Loc ใหม่</h2>
+          <label>วันเริ่ม Loc</label>
+          <input class="input" id="slotStart" type="date" required>
+          <label>จำนวนวันลา</label>
+          <input class="input" id="slotLeaveDays" type="number" min="1" max="5" value="5">
+          <label>รายชื่อเข้าจับฉลาก</label>
+          <textarea class="input textarea" id="directWinnerName" placeholder="ใส่ชื่อผู้จอง เช่น รัชพร, แสงดาว"></textarea>
+          <p class="hint">ใส่หลายชื่อได้โดยคั่นด้วย comma หรือขึ้นบรรทัดใหม่ ระบบจะรวมเป็น Loc เดียวแล้วนำไปจับฉลาก · 1 Loc = จันทร์-ศุกร์</p>
+          <button class="btn primary" type="submit">บันทึก Loc</button>
+        </form>
+
+        <form class="card form" id="bookingForm">
+          <h2>ลงชื่อจอง Loc</h2>
+          <label>เลือก Loc ที่เปิดไว้</label>
+          <select class="input" id="bookingSlot"></select>
+          <label>หรือเลือกวันเริ่ม Loc</label>
+          <input class="input" id="bookingStart" type="date">
+          <label>จำนวนวันลา ถ้าสร้าง Loc ใหม่</label>
+          <input class="input" id="bookingLeaveDays" type="number" min="1" max="5" value="5">
+          <p class="hint">เลือกวันจันทร์ที่ต้องการจอง ระบบจะนับเป็นช่วงจันทร์-ศุกร์ให้อัตโนมัติ</p>
+          <label>ชื่อผู้จอง</label>
+          <input class="input" id="bookingName" placeholder="เช่น พี่แป้ง" required>
+          <button class="btn primary" type="submit">ลงชื่อจอง</button>
+        </form>
       </div>
-    `).join("")
-    : `<p class="hint">ยังไม่มีวันหยุดพิเศษในปีนี้</p>`;
-}
 
-function renderRecent(yearSlots) {
-  const rows = [...yearSlots].slice(-6).reverse().map(slot => `<div class="slot-card"><strong>${escapeHtml(slotDisplayTitle(slot))}</strong><span>${slotDateLabel(slot)}</span></div>`);
-  el.recentList.innerHTML = rows.join("") || `<div class="slot-card">ยังไม่มีรายการ</div>`;
-}
+      <h2 class="section-title">Loc ที่เปิดจอง</h2>
+      <div class="slot-list" id="openSlotList"></div>
+    </section>
 
-function expandSlots(items) {
-  const days = [];
-  items.forEach(slot => {
-    for (let date = new Date(`${slot.start_date}T00:00:00`); date <= new Date(`${slot.end_date}T00:00:00`); date.setDate(date.getDate() + 1)) {
-      if (isWeekendDate(date)) continue;
-      days.push({ date: iso(date), ...slot });
-    }
-  });
-  return days;
-}
+    <section class="panel" data-panel="draw">
+      <div class="section-head">
+        <h2>จับฉลากหน้างาน</h2>
+        <p>Loc หนึ่งสามารถมีคนจองหลายคน กดจับฉลากเพื่อเลือกผู้ได้ Loc</p>
+      </div>
+      <div class="slot-list" id="drawList"></div>
+    </section>
 
-function groupByDate(items) {
-  const map = new Map();
-  items.forEach(item => { if (!map.has(item.date)) map.set(item.date, []); map.get(item.date).push(item); });
-  return map;
-}
+    <section class="panel" data-panel="summary">
+      <div class="grid two">
+        <article class="card">
+          <h2>สรุปผู้ได้ Loc</h2>
+          <div class="person-list" id="winnerSummary"></div>
+        </article>
+        <form class="card form" id="holidayForm">
+          <h2>วันหยุดพิเศษ</h2>
+          <label>ชื่อวันหยุด</label>
+          <input class="input" id="holidayName" placeholder="เช่น วันจักรี">
+          <label>วันที่</label>
+          <input class="input" id="holidayDate" type="date">
+          <button class="btn primary" type="submit">เพิ่มวันหยุดพิเศษ</button>
+          <div class="holiday-summary" id="holidaySummary"></div>
+        </form>
+      </div>
+      <h2 class="section-title">รายการล่าสุด</h2>
+      <div class="slot-list" id="recentList"></div>
+    </section>
 
-function groupHolidays() {
-  const all = [...BASE_HOLIDAYS.map(([holiday_date, name]) => ({ holiday_date, name })), ...customHolidays];
-  const map = new Map();
-  all.forEach(item => {
-    if (!isInSelectedFiscalYear(item.holiday_date)) return;
-    if (!map.has(item.holiday_date)) map.set(item.holiday_date, []);
-    map.get(item.holiday_date).push(item);
-  });
-  return map;
-}
+    <p class="note" id="note"></p>
+  </main>
 
-function buildFiscalMonths(fiscalYearBe) {
-  const prevBe = fiscalYearBe - 1, prevAd = prevBe - 543, currentAd = fiscalYearBe - 543;
-  return [
-    { beYear: prevBe, adYear: prevAd, month: 10 }, { beYear: prevBe, adYear: prevAd, month: 11 }, { beYear: prevBe, adYear: prevAd, month: 12 },
-    { beYear: fiscalYearBe, adYear: currentAd, month: 1 }, { beYear: fiscalYearBe, adYear: currentAd, month: 2 }, { beYear: fiscalYearBe, adYear: currentAd, month: 3 },
-    { beYear: fiscalYearBe, adYear: currentAd, month: 4 }, { beYear: fiscalYearBe, adYear: currentAd, month: 5 }, { beYear: fiscalYearBe, adYear: currentAd, month: 6 },
-    { beYear: fiscalYearBe, adYear: currentAd, month: 7 }, { beYear: fiscalYearBe, adYear: currentAd, month: 8 }, { beYear: fiscalYearBe, adYear: currentAd, month: 9 }
-  ];
-}
-
-function populateFiscalYearSelect() {
-  let html = "";
-  for (let year = selectedFiscalYear - 1; year <= selectedFiscalYear + 4; year++) html += `<option value="${year}">ปี ${year}</option>`;
-  el.fiscalYearSelect.innerHTML = html;
-  el.fiscalYearSelect.value = String(selectedFiscalYear);
-}
-
-function syncDateBounds() {
-  const first = MONTHS[0], last = MONTHS[MONTHS.length - 1];
-  const minDate = `${first.adYear}-${String(first.month).padStart(2, "0")}-01`;
-  const maxDate = iso(new Date(last.adYear, last.month, 0));
-  const firstMonday = nextMondayOnOrAfter(minDate);
-  el.slotStart.min = minDate;
-  el.slotStart.max = maxDate;
-  el.bookingStart.min = minDate;
-  el.bookingStart.max = maxDate;
-  if (!el.slotStart.value || el.slotStart.value < minDate || el.slotStart.value > maxDate || !isMondayText(el.slotStart.value)) {
-    el.slotStart.value = firstMonday;
-  }
-  if (el.bookingStart.value && (el.bookingStart.value < minDate || el.bookingStart.value > maxDate || !isMondayText(el.bookingStart.value))) {
-    el.bookingStart.value = "";
-  }
-  el.holidayDate.min = minDate;
-  el.holidayDate.max = maxDate;
-  if (!el.holidayDate.value || el.holidayDate.value < minDate || el.holidayDate.value > maxDate) el.holidayDate.value = minDate;
-}
-
-function isInSelectedFiscalYear(dateText) {
-  const first = MONTHS[0], last = MONTHS[MONTHS.length - 1];
-  const min = `${first.adYear}-${String(first.month).padStart(2, "0")}-01`;
-  const max = iso(new Date(last.adYear, last.month, 0));
-  return dateText >= min && dateText <= max;
-}
-
-function overlapsFiscalYear(start, end) {
-  const first = MONTHS[0], last = MONTHS[MONTHS.length - 1];
-  const min = `${first.adYear}-${String(first.month).padStart(2, "0")}-01`;
-  const max = iso(new Date(last.adYear, last.month, 0));
-  return start <= max && end >= min;
-}
-
-function readLocal(key) { try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; } }
-function writeLocal(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
-function validateMonday(dateText, input) {
-  if (isMondayText(dateText)) return true;
-  alert("วันเริ่ม Loc ต้องเป็นวันจันทร์เท่านั้น เพราะ 1 Loc คือจันทร์-ศุกร์");
-  input?.focus();
-  return false;
-}
-function slotMatchesQuery(slot, query) {
-  if (!query) return true;
-  const candidates = bookings.filter(item => item.slot_id === slot.id).map(item => item.person_name).join(" ");
-  return searchableText([
-    slot.label,
-    slot.start_date,
-    slot.end_date,
-    formatDate(slot.start_date),
-    formatDate(slot.end_date),
-    formatShort(slot.start_date),
-    formatShort(slot.end_date),
-    slot.winner_name || "",
-    candidates
-  ]).includes(query);
-}
-function holidayMatchesQuery(item, query) {
-  if (!query) return true;
-  return searchableText([item.name, item.holiday_date, formatDate(item.holiday_date), formatShort(item.holiday_date)]).includes(query);
-}
-function searchableText(parts) { return parts.join(" ").toLowerCase(); }
-function defaultSlotLabel(start, end) { return `${formatShort(start)}-${formatShort(end)}`; }
-function slotDateLabel(slot) { return `${formatDate(slot.start_date)} - ${formatDate(slot.end_date)}`; }
-function slotDisplayTitle(slot) {
-  if (slot.winner_name) return `ผู้ได้ Loc: ${slot.winner_name}`;
-  const count = candidateCount(slot.id);
-  return count ? `รอจับฉลาก (${count} คนจอง)` : "ยังไม่มีผู้จอง";
-}
-function addBusinessDays(dateText, count) {
-  const date = new Date(`${dateText}T00:00:00`);
-  let added = 0;
-  while (added < count) {
-    if (!isWeekendDate(date)) added += 1;
-    if (added < count) date.setDate(date.getDate() + 1);
-  }
-  return iso(date);
-}
-function isMondayText(dateText) { return new Date(`${dateText}T00:00:00`).getDay() === 1; }
-function nextMondayOnOrAfter(dateText) {
-  const date = new Date(`${dateText}T00:00:00`);
-  while (date.getDay() !== 1) date.setDate(date.getDate() + 1);
-  return iso(date);
-}
-function isWeekendDate(date) { return date.getDay() === 0 || date.getDay() === 6; }
-function addDays(dateText, days) { const d = new Date(`${dateText}T00:00:00`); d.setDate(d.getDate() + days); return iso(d); }
-function iso(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
-function formatDate(dateText) { return longDate.format(new Date(`${dateText}T00:00:00`)); }
-function formatShort(dateText) { const d = new Date(`${dateText}T00:00:00`); return `${d.getDate()} ${thMonthFull[d.getMonth()]}`; }
-function candidateCount(slotId) { return bookings.filter(item => item.slot_id === slotId).length; }
-function displayNames(names) { const clean = [...new Set(names.filter(Boolean))]; return clean.length <= 2 ? clean.join(", ") : `${clean[0]}, ${clean[1]} +${clean.length - 2}`; }
-function escapeHtml(value) { return String(value).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[ch]); }
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
