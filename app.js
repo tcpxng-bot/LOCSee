@@ -213,7 +213,8 @@ async function saveBookings(slotId, names) {
   const existingNames = bookings.filter(item => item.slot_id === slotId).map(item => item.person_name.trim().toLowerCase());
   const newNames = cleanNames.filter(name => !existingNames.includes(name.toLowerCase()));
   if (!newNames.length) return true;
-  const rows = newNames.map(name => ({ slot_id: slotId, person_name: name }));
+  const slot = slots.find(item => item.id === slotId);
+  const rows = newNames.map(name => ({ slot_id: slotId, person_name: name, leave_days: slotLeaveDays(slot) }));
   if (hasSupabase) {
     const { error } = await db.from("loc_bookings").insert(rows);
     if (error) {
@@ -270,6 +271,41 @@ async function saveSlot(item) {
   slots.push(saved);
   writeLocal(VAC_KEY, slots);
   return saved;
+}
+
+async function updateSlotLeaveDays(slotId, value) {
+  const leaveDays = normalizeLeaveDays(value);
+  if (hasSupabase) {
+    const { error } = await db.from("loc_slots").update({ leave_days: leaveDays }).eq("id", slotId);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+  } else {
+    slots = slots.map(slot => slot.id === slotId ? { ...slot, leave_days: leaveDays } : slot);
+    writeLocal(VAC_KEY, slots);
+  }
+  await loadData();
+}
+
+async function updatePersonLeaveDays(slotId, personName, value) {
+  const leaveDays = normalizeLeaveDays(value);
+  const booking = bookingForPerson(slotId, personName);
+  if (!booking) {
+    alert("ยังไม่พบชื่อผู้จองคนนี้ใน Loc นี้");
+    return;
+  }
+  if (hasSupabase) {
+    const { error } = await db.from("loc_bookings").update({ leave_days: leaveDays }).eq("id", booking.id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+  } else {
+    bookings = bookings.map(item => item.id === booking.id ? { ...item, leave_days: leaveDays } : item);
+    writeLocal(BOOKING_KEY, bookings);
+  }
+  await loadData();
 }
 
 async function createHoliday(event) {
@@ -529,6 +565,15 @@ function slotCard(slot) {
     const selected = winnerNames.includes(item.person_name) ? "selected" : "";
     return `<option value="${escapeHtml(item.person_name)}" ${selected}>${escapeHtml(item.person_name)}</option>`;
   }).join("");
+  const winnerLeaveRows = winnerNames.map(name => `
+    <div class="winner-day-row">
+      <strong>${escapeHtml(name)}</strong>
+      <label class="mini-field">ใช้จริง
+        <input class="input count-input" type="number" min="1" max="${LOCK_DAYS}" value="${personLeaveDays(slot, name)}" data-person-leave="${slot.id}" data-person-name="${escapeHtml(name)}">
+      </label>
+      <button class="btn small" type="button" data-save-person-leave="${slot.id}" data-person-name="${escapeHtml(name)}">บันทึก</button>
+    </div>
+  `).join("");
   return `
     <article class="slot-card">
       <div class="slot-top">
@@ -538,7 +583,7 @@ function slotCard(slot) {
           <div class="candidate-list">${candidates}</div>
         </div>
         <div class="actions">
-          ${slotBookings.length ? `
+          ${slotBookings.length && !winnerNames.length ? `
             <label class="mini-field">ผู้ได้
               <input class="input count-input" type="number" min="1" max="${slotBookings.length}" value="${Math.min(Math.max(winnerNames.length || 1, 1), slotBookings.length)}" data-winner-count="${slot.id}">
             </label>
@@ -548,13 +593,37 @@ function slotCard(slot) {
           <button class="btn danger" type="button" data-delete-slot="${slot.id}">ลบ Loc</button>
         </div>
       </div>
+      <div class="actual-days">
+        <label class="mini-field">วันลาที่ใช้จริง
+          <input class="input count-input" type="number" min="1" max="${LOCK_DAYS}" value="${slotLeaveDays(slot)}" data-leave-days="${slot.id}">
+        </label>
+        <span class="slot-meta">ค่าเริ่มต้นของรอบ Loc นี้</span>
+        <button class="btn" type="button" data-save-leave="${slot.id}">บันทึกค่าเริ่มต้น</button>
+      </div>
+      ${winnerLeaveRows ? `<div class="winner-days">${winnerLeaveRows}</div>` : ""}
       ${slotBookings.length ? `
-        <div class="manual-winner">
-          <select class="input compact-input" data-winner-select="${slot.id}" multiple size="${Math.min(slotBookings.length, 4)}">
-            ${winnerOptions}
-          </select>
-          <button class="btn" type="button" data-choose-winner="${slot.id}">บันทึกผู้ได้</button>
-        </div>
+        ${winnerNames.length ? `
+          <details class="manual-winner edit-winner">
+            <summary>แก้ผล / จับใหม่</summary>
+            <div class="manual-winner-fields">
+              <label class="mini-field">ผู้ได้
+                <input class="input count-input" type="number" min="1" max="${slotBookings.length}" value="${Math.min(Math.max(winnerNames.length || 1, 1), slotBookings.length)}" data-winner-count="${slot.id}">
+              </label>
+              <button class="btn draw" type="button" data-draw="${slot.id}">จับฉลากใหม่</button>
+              <select class="input compact-input" data-winner-select="${slot.id}" multiple size="${Math.min(slotBookings.length, 4)}">
+                ${winnerOptions}
+              </select>
+              <button class="btn" type="button" data-choose-winner="${slot.id}">บันทึกผู้ได้</button>
+            </div>
+          </details>
+        ` : `
+          <div class="manual-winner">
+            <select class="input compact-input" data-winner-select="${slot.id}" multiple size="${Math.min(slotBookings.length, 4)}">
+              ${winnerOptions}
+            </select>
+            <button class="btn" type="button" data-choose-winner="${slot.id}">บันทึกผู้ได้</button>
+          </div>
+        `}
       ` : ""}
     </article>
   `;
@@ -564,6 +633,15 @@ function bindSlotActions(root) {
   root.querySelectorAll("[data-draw]").forEach(btn => btn.addEventListener("click", () => {
     const input = root.querySelector(`[data-winner-count="${CSS.escape(btn.dataset.draw)}"]`);
     drawSlot(btn.dataset.draw, input?.value || 1);
+  }));
+  root.querySelectorAll("[data-save-leave]").forEach(btn => btn.addEventListener("click", () => {
+    const input = root.querySelector(`[data-leave-days="${CSS.escape(btn.dataset.saveLeave)}"]`);
+    updateSlotLeaveDays(btn.dataset.saveLeave, input?.value || LOCK_DAYS);
+  }));
+  root.querySelectorAll("[data-save-person-leave]").forEach(btn => btn.addEventListener("click", () => {
+    const input = [...root.querySelectorAll("[data-person-leave]")]
+      .find(item => item.dataset.personLeave === btn.dataset.savePersonLeave && item.dataset.personName === btn.dataset.personName);
+    updatePersonLeaveDays(btn.dataset.savePersonLeave, btn.dataset.personName, input?.value || LOCK_DAYS);
   }));
   root.querySelectorAll("[data-choose-winner]").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -581,17 +659,17 @@ function renderSummary(yearSlots) {
   yearSlots.forEach(slot => {
     splitWinners(slot.winner_name).forEach(name => {
       if (!groups.has(name)) groups.set(name, []);
-      groups.get(name).push(slot);
+      groups.get(name).push({ slot, leaveDays: personLeaveDays(slot, name) });
     });
   });
   const rows = [...groups.entries()].sort((a, b) => sumLeaveDays(b[1]) - sumLeaveDays(a[1]) || a[0].localeCompare(b[0], "th"));
   el.winnerSummary.innerHTML = rows.length
-    ? rows.map(([name, personSlots], index) => `
+    ? rows.map(([name, personItems], index) => `
       <div class="person-row compact">
         <span class="rank">${index + 1}</span>
         <strong>${escapeHtml(name)}</strong>
-        <span class="count-pill">ใช้ ${sumLeaveDays(personSlots)} / ${TOTAL_ALLOWANCE_DAYS} วัน</span>
-        <small>คงเหลือ ${remainingLeaveDays(personSlots)} วัน · ${personSlots.length} ล็อค · ${escapeHtml(personSlots.map(slot => `${formatShort(slot.start_date)}-${formatShort(slot.end_date)} (${slotLeaveDays(slot)}ว)`).join(", "))}</small>
+        <span class="count-pill">ใช้ ${sumLeaveDays(personItems)} / ${TOTAL_ALLOWANCE_DAYS} วัน</span>
+        <small>คงเหลือ ${remainingLeaveDays(personItems)} วัน · ${personItems.length} ล็อค · ${escapeHtml(personItems.map(item => `${formatShort(item.slot.start_date)}-${formatShort(item.slot.end_date)} (${item.leaveDays}ว)`).join(", "))}</small>
       </div>
     `).join("")
     : `<div class="slot-card">ยังไม่มีผลจับฉลาก</div>`;
@@ -732,8 +810,15 @@ function detailGroupRow(group) {
 }
 function normalizeLeaveDays(value) { return Math.max(1, Math.min(Number(value) || LOCK_DAYS, LOCK_DAYS)); }
 function slotLeaveDays(slot) { return normalizeLeaveDays(slot?.leave_days); }
-function sumLeaveDays(personSlots) { return personSlots.reduce((total, slot) => total + slotLeaveDays(slot), 0); }
-function remainingLeaveDays(personSlots) { return TOTAL_ALLOWANCE_DAYS - sumLeaveDays(personSlots); }
+function bookingForPerson(slotId, personName) {
+  const target = String(personName || "").trim().toLowerCase();
+  return bookings.find(item => item.slot_id === slotId && item.person_name.trim().toLowerCase() === target);
+}
+function personLeaveDays(slot, personName) {
+  return normalizeLeaveDays(bookingForPerson(slot.id, personName)?.leave_days ?? slotLeaveDays(slot));
+}
+function sumLeaveDays(personItems) { return personItems.reduce((total, item) => total + (item.leaveDays ?? slotLeaveDays(item)), 0); }
+function remainingLeaveDays(personItems) { return TOTAL_ALLOWANCE_DAYS - sumLeaveDays(personItems); }
 function validateMonday(dateText, input) {
   if (isMondayText(dateText)) return true;
   alert("วันเริ่ม Loc ต้องเป็นวันจันทร์เท่านั้น เพราะ 1 Loc คือจันทร์-ศุกร์");
