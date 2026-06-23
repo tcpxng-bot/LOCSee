@@ -118,6 +118,7 @@ button, input, select { font: inherit; }
 .btn.small { min-height: 30px; padding: 0 10px; font-size: 15px; box-shadow: 0 3px 0 var(--shadow); }
 .btn.ghost { background: rgba(255,253,248,.72); border-width: 2px; color: var(--muted); }
 .input { width: 100%; padding: 0 12px; }
+.textarea { min-height: 82px; padding: 10px 12px; resize: vertical; }
 
 .toolbar {
   display: grid;
@@ -140,6 +141,16 @@ button, input, select { font: inherit; }
 h1, h2, p { margin-top: 0; }
 h2 { margin-bottom: 10px; }
 .section-head p, .hint { color: var(--muted); margin-bottom: 0; }
+
+.panel[data-panel="summary"] > .grid > article.card {
+  padding: 16px;
+}
+
+.panel[data-panel="summary"] h2 {
+  font-size: 24px;
+  line-height: 1.05;
+  margin-bottom: 12px;
+}
 
 .legend {
   display: flex;
@@ -292,6 +303,12 @@ h2 { margin-bottom: 10px; }
   gap: 10px;
 }
 
+.person-list {
+  max-height: 560px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
 .slot-card, .person-row {
   display: grid;
   gap: 8px;
@@ -302,7 +319,7 @@ h2 { margin-bottom: 10px; }
 }
 
 .person-row.compact {
-  grid-template-columns: 34px minmax(90px, 1fr) auto minmax(160px, 1.6fr);
+  grid-template-columns: 34px minmax(90px, 1fr) auto minmax(220px, 1.8fr);
   align-items: center;
   padding: 8px 10px;
   border-width: 2px;
@@ -311,9 +328,8 @@ h2 { margin-bottom: 10px; }
 
 .person-row.compact small {
   color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.25;
 }
 
 .rank, .count-pill {
@@ -355,6 +371,19 @@ h2 { margin-bottom: 10px; }
 .winner { color: #2f6f50; font-weight: 900; }
 
 .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: end; }
+.mini-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 900;
+  color: var(--muted);
+}
+.count-input {
+  width: 64px;
+  min-height: 34px;
+  padding: 0 6px;
+  text-align: center;
+}
 .manual-winner {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) auto;
