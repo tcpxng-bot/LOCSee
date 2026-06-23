@@ -417,20 +417,8 @@ function renderSearchDetails(query, matchedSlots, holidayMap) {
     return;
   }
   const matchedHolidays = [...holidayMap.values()].flat().filter(item => holidayMatchesQuery(item, query));
-  const slotRows = matchedSlots.map(slot => {
-    const slotBookings = bookings.filter(item => item.slot_id === slot.id).map(item => item.person_name);
-    const winners = splitWinners(slot.winner_name);
-    const status = winners.length ? `ผู้ได้ Loc: ${displayNames(winners)}` : `รอจับฉลาก (${slotBookings.length} คนจอง)`;
-    const bookButton = slot.status !== "drawn" ? `<button class="btn small" type="button" data-book-slot="${slot.id}">จองรอบนี้</button>` : "";
-    return `
-      <div class="detail-row">
-        <strong>${escapeHtml(status)}</strong>
-        <span>${slotDateLabel(slot)} · ${slotLeaveDays(slot)} วัน</span>
-        <small>ผู้จอง: ${escapeHtml(slotBookings.join(", ") || "ยังไม่มี")}</small>
-        ${bookButton}
-      </div>
-    `;
-  }).join("");
+  const detailGroups = groupSlotsForDetails(matchedSlots);
+  const slotRows = detailGroups.map(detailGroupRow).join("");
   const holidayRows = matchedHolidays.map(item => `
     <div class="detail-row holiday-row">
       <strong>วันหยุดพิเศษ</strong>
@@ -438,7 +426,7 @@ function renderSearchDetails(query, matchedSlots, holidayMap) {
       <small>${formatDate(item.holiday_date)}</small>
     </div>
   `).join("");
-  const total = matchedSlots.length + matchedHolidays.length;
+  const total = detailGroups.length + matchedHolidays.length;
   el.dayDetails.innerHTML = `
     <div class="detail-head">
       <strong>ผลค้นหา: ${escapeHtml(query)}</strong>
@@ -455,20 +443,8 @@ function renderSearchDetails(query, matchedSlots, holidayMap) {
 function showDayDetails(dateText, slotDayMap, holidayMap) {
   const daySlots = slotDayMap.get(dateText) || [];
   const holidays = holidayMap.get(dateText) || [];
-  const slotRows = daySlots.map(slot => {
-    const slotBookings = bookings.filter(item => item.slot_id === slot.id).map(item => item.person_name);
-    const winners = splitWinners(slot.winner_name);
-    const status = winners.length ? `ผู้ได้ Loc: ${displayNames(winners)}` : `รอจับฉลาก (${slotBookings.length} คนจอง)`;
-    const bookButton = slot.status !== "drawn" ? `<button class="btn small" type="button" data-book-slot="${slot.id}">จองรอบนี้</button>` : "";
-    return `
-      <div class="detail-row">
-        <strong>${escapeHtml(status)}</strong>
-        <span>${slotDateLabel(slot)} · ${slotLeaveDays(slot)} วัน</span>
-        <small>ผู้จอง: ${escapeHtml(slotBookings.join(", ") || "ยังไม่มี")}</small>
-        ${bookButton}
-      </div>
-    `;
-  }).join("");
+  const detailGroups = groupSlotsForDetails(daySlots);
+  const slotRows = detailGroups.map(detailGroupRow).join("");
   const holidayRows = holidays.map(item => `
     <div class="detail-row holiday-row">
       <strong>วันหยุดพิเศษ</strong>
@@ -478,7 +454,7 @@ function showDayDetails(dateText, slotDayMap, holidayMap) {
   el.dayDetails.innerHTML = `
     <div class="detail-head">
       <strong>${formatDate(dateText)}</strong>
-      <span>${daySlots.length ? `${daySlots.length} Loc` : ""}${daySlots.length && holidays.length ? " · " : ""}${holidays.length ? `${holidays.length} วันหยุด` : ""}</span>
+      <span>${detailGroups.length ? `${detailGroups.length} Loc` : ""}${detailGroups.length && holidays.length ? " · " : ""}${holidays.length ? `${holidays.length} วันหยุด` : ""}</span>
     </div>
     <div class="detail-list">${slotRows}${holidayRows}</div>
   `;
@@ -687,6 +663,32 @@ function parseNames(value) {
 }
 function splitWinners(value) { return parseNames(value || ""); }
 function joinWinners(names) { return [...new Set(names.map(name => name.trim()).filter(Boolean))].join(", "); }
+function uniqueNames(names) { return [...new Set(names.map(name => name.trim()).filter(Boolean))]; }
+function groupSlotsForDetails(items) {
+  const groups = new Map();
+  items.forEach(slot => {
+    const key = `${slot.start_date}|${slot.end_date}|${slotLeaveDays(slot)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(slot);
+  });
+  return [...groups.values()];
+}
+function detailGroupRow(group) {
+  const first = group[0];
+  const groupBookings = uniqueNames(group.flatMap(slot => bookings.filter(item => item.slot_id === slot.id).map(item => item.person_name)));
+  const groupWinners = uniqueNames(group.flatMap(slot => splitWinners(slot.winner_name)));
+  const openSlot = group.find(slot => slot.status !== "drawn");
+  const status = groupWinners.length ? `ผู้ได้ Loc: ${displayNames(groupWinners)}` : `รอจับฉลาก (${groupBookings.length} คนจอง)`;
+  const bookButton = openSlot ? `<button class="btn small" type="button" data-book-slot="${openSlot.id}">จองรอบนี้</button>` : "";
+  return `
+    <div class="detail-row">
+      <strong>${escapeHtml(status)}</strong>
+      <span>${slotDateLabel(first)} · ${slotLeaveDays(first)} วัน</span>
+      <small>ผู้จอง: ${escapeHtml(groupBookings.join(", ") || "ยังไม่มี")}</small>
+      ${bookButton}
+    </div>
+  `;
+}
 function normalizeLeaveDays(value) { return Math.max(1, Math.min(Number(value) || LOCK_DAYS, LOCK_DAYS)); }
 function slotLeaveDays(slot) { return normalizeLeaveDays(slot?.leave_days); }
 function sumLeaveDays(personSlots) { return personSlots.reduce((total, slot) => total + slotLeaveDays(slot), 0); }
