@@ -311,6 +311,26 @@ async function setWinner(slotId, winner) {
   await loadData();
 }
 
+async function clearWinner(slotId) {
+  if (hasSupabase) {
+    const { error } = await db.from("loc_slots").update({ winner_name: null, status: "open" }).eq("id", slotId);
+    if (error) return alert(error.message);
+  } else {
+    slots = slots.map(slot => slot.id === slotId ? { ...slot, winner_name: null, status: "open" } : slot);
+    writeLocal(VAC_KEY, slots);
+  }
+}
+
+async function moveWinnerToBookings(slotId) {
+  const slot = slots.find(item => item.id === slotId);
+  const names = splitWinners(slot?.winner_name);
+  if (!slot || !names.length) return;
+  const ok = await saveBookings(slotId, names);
+  if (!ok) return;
+  await clearWinner(slotId);
+  await loadData();
+}
+
 async function deleteItem(type, id) {
   if (!confirm("ลบรายการนี้?")) return;
   if (hasSupabase) {
@@ -507,6 +527,7 @@ function slotCard(slot) {
             </label>
             <button class="btn draw" type="button" data-draw="${slot.id}">จับฉลาก</button>
           ` : ""}
+          ${!slotBookings.length && winnerNames.length ? `<button class="btn" type="button" data-move-winner="${slot.id}">ย้ายเป็นผู้จอง</button>` : ""}
           <button class="btn danger" type="button" data-delete-slot="${slot.id}">ลบ Loc</button>
         </div>
       </div>
@@ -535,6 +556,7 @@ function bindSlotActions(root) {
     });
   });
   root.querySelectorAll("[data-delete-slot]").forEach(btn => btn.addEventListener("click", () => deleteItem("slot", btn.dataset.deleteSlot)));
+  root.querySelectorAll("[data-move-winner]").forEach(btn => btn.addEventListener("click", () => moveWinnerToBookings(btn.dataset.moveWinner)));
 }
 
 function renderSummary(yearSlots) {
