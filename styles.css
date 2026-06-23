@@ -184,9 +184,9 @@ h2 { margin-bottom: 10px; }
 
 .year-scroll { overflow-x: auto; background: var(--card); border-width: 3px; }
 .year-table {
-  min-width: 980px;
+  min-width: 1200px;
   display: grid;
-  grid-template-columns: 112px repeat(31, minmax(25px, 1fr));
+  grid-template-columns: 118px repeat(31, minmax(32px, 1fr));
   gap: 2px;
   padding: 2px;
   background: var(--line);
@@ -195,7 +195,7 @@ h2 { margin-bottom: 10px; }
 }
 
 .year-cell {
-  min-height: 42px;
+  min-height: 48px;
   border: 0;
   border-radius: 6px;
   background: white;
@@ -250,9 +250,9 @@ h2 { margin-bottom: 10px; }
   white-space: pre-line;
   overflow: hidden;
   text-overflow: clip;
-  font-size: 10px;
-  line-height: 1.05;
-  max-height: 24px;
+  font-size: 10.5px;
+  line-height: 1.12;
+  max-height: 30px;
 }
 
 .day-details {
