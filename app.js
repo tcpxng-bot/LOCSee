@@ -386,6 +386,54 @@ async function moveWinnerToBookings(slotId) {
   await loadData();
 }
 
+async function swapWinners(firstSlotId, secondSlotId) {
+  if (!firstSlotId || !secondSlotId) return alert("กรุณาเลือก Loc ที่ต้องการแลกให้ครบทั้ง 2 รายการ");
+  if (firstSlotId === secondSlotId) return alert("กรุณาเลือก Loc คนละรายการ");
+
+  const firstSlot = slots.find(slot => String(slot.id) === String(firstSlotId));
+  const secondSlot = slots.find(slot => String(slot.id) === String(secondSlotId));
+  if (!firstSlot?.winner_name || !secondSlot?.winner_name) return alert("Loc ที่เลือกต้องมีผู้ได้แล้วทั้ง 2 รายการ");
+
+  const message = [
+    "ยืนยันการแลก Loc โดยไม่จับฉลากใหม่?",
+    "",
+    `${firstSlot.winner_name}: ${slotDateLabel(firstSlot)}`,
+    `⇄ ${secondSlot.winner_name}: ${slotDateLabel(secondSlot)}`
+  ].join("\n");
+  if (!confirm(message)) return;
+
+  const firstWinner = firstSlot.winner_name;
+  const secondWinner = secondSlot.winner_name;
+
+  if (hasSupabase) {
+    const firstResult = await db.from("loc_slots")
+      .update({ winner_name: secondWinner, status: "drawn" })
+      .eq("id", firstSlot.id);
+    if (firstResult.error) return alert(`แลก Loc ไม่สำเร็จ: ${firstResult.error.message}`);
+
+    const secondResult = await db.from("loc_slots")
+      .update({ winner_name: firstWinner, status: "drawn" })
+      .eq("id", secondSlot.id);
+    if (secondResult.error) {
+      const rollback = await db.from("loc_slots")
+        .update({ winner_name: firstWinner, status: "drawn" })
+        .eq("id", firstSlot.id);
+      const rollbackMessage = rollback.error ? " และคืนค่ารายการแรกไม่สำเร็จ กรุณาตรวจสอบข้อมูล" : " ระบบคืนค่ารายการแรกให้แล้ว";
+      return alert(`แลก Loc ไม่สำเร็จ: ${secondResult.error.message}${rollbackMessage}`);
+    }
+  } else {
+    slots = slots.map(slot => {
+      if (String(slot.id) === String(firstSlot.id)) return { ...slot, winner_name: secondWinner, status: "drawn" };
+      if (String(slot.id) === String(secondSlot.id)) return { ...slot, winner_name: firstWinner, status: "drawn" };
+      return slot;
+    });
+    writeLocal(VAC_KEY, slots);
+  }
+
+  await loadData();
+  alert("แลก Loc เรียบร้อยแล้ว");
+}
+
 async function deleteItem(type, id) {
   if (!confirm("ลบรายการนี้?")) return;
   if (hasSupabase) {
@@ -571,8 +619,53 @@ function renderOpenSlots(items) {
 }
 
 function renderDrawList(items) {
-  el.drawList.innerHTML = items.length ? items.map(slotCard).join("") : `<div class="card slot-card">ยังไม่มี Loc สำหรับจับฉลาก</div>`;
+  const drawnSlots = items.filter(slot => slot.status === "drawn" && splitWinners(slot.winner_name).length);
+  const swapPanel = drawnSlots.length >= 2 ? renderSwapPanel(drawnSlots) : "";
+  const cards = items.length ? items.map(slotCard).join("") : `<div class="card slot-card">ยังไม่มี Loc สำหรับจับฉลาก</div>`;
+  el.drawList.innerHTML = swapPanel + cards;
+  bindSwapActions(el.drawList);
   bindSlotActions(el.drawList);
+}
+
+function renderSwapPanel(drawnSlots) {
+  const options = drawnSlots.map(slot => `
+    <option value="${escapeHtml(String(slot.id))}">${escapeHtml(slot.winner_name)} · ${escapeHtml(slotDateLabel(slot))}</option>
+  `).join("");
+  return `
+    <section class="swap-panel card">
+      <div>
+        <h2>แลก Loc กันเอง</h2>
+        <p>เลือก Loc ของทั้งสองฝ่าย ระบบจะสลับผู้ได้โดยไม่จับฉลากใหม่</p>
+      </div>
+      <div class="swap-fields">
+        <label>Loc ฝ่ายที่ 1
+          <select class="input" data-swap-first>
+            <option value="">เลือก Loc</option>
+            ${options}
+          </select>
+        </label>
+        <span class="swap-arrow" aria-hidden="true">⇄</span>
+        <label>Loc ฝ่ายที่ 2
+          <select class="input" data-swap-second>
+            <option value="">เลือก Loc</option>
+            ${options}
+          </select>
+        </label>
+        <button class="btn swap" type="button" data-swap-winners>ยืนยันแลก Loc</button>
+      </div>
+      <small>หมายเหตุ: ถ้า Loc มีผู้ได้หลายคน ระบบจะสลับรายชื่อทั้งกลุ่ม</small>
+    </section>
+  `;
+}
+
+function bindSwapActions(root) {
+  const button = root.querySelector("[data-swap-winners]");
+  if (!button) return;
+  button.addEventListener("click", () => {
+    const first = root.querySelector("[data-swap-first]")?.value;
+    const second = root.querySelector("[data-swap-second]")?.value;
+    swapWinners(first, second);
+  });
 }
 
 function slotCard(slot) {
