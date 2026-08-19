@@ -97,6 +97,8 @@ const el = {
   note: document.querySelector("#note")
 };
 
+console.log("[LOCSee] app.js loaded (มีปุ่มปริ้น):", Boolean(el.printBtn));
+
 populateFiscalYearSelect();
 applySavedTheme();
 syncDateBounds();
@@ -112,25 +114,33 @@ el.loginForm.addEventListener("submit", event => {
   }
 });
 
+function on(target, eventName, handler) {
+  if (!target) {
+    console.warn(`[LOCSee] ไม่พบ element สำหรับ event "${eventName}" — ตรวจสอบว่าไฟล์ index.html เป็นเวอร์ชันล่าสุด`);
+    return;
+  }
+  target.addEventListener(eventName, handler);
+}
+
 el.tabButtons.forEach(button => button.addEventListener("click", () => setTab(button.dataset.tab)));
-el.search.addEventListener("input", render);
-el.logoutBtn.addEventListener("click", logoutApp);
-el.reloadBtn.addEventListener("click", loadData);
-el.printBtn.addEventListener("click", printYearOverview);
-el.themeSelect.addEventListener("change", () => {
+on(el.search, "input", render);
+on(el.logoutBtn, "click", logoutApp);
+on(el.reloadBtn, "click", loadData);
+on(el.printBtn, "click", printYearOverview);
+on(el.themeSelect, "change", () => {
   applyTheme(el.themeSelect.value);
   localStorage.setItem(THEME_KEY, el.themeSelect.value);
 });
-el.fiscalYearSelect.addEventListener("change", () => {
+on(el.fiscalYearSelect, "change", () => {
   selectedFiscalYear = Number(el.fiscalYearSelect.value);
   localStorage.setItem(YEAR_KEY, String(selectedFiscalYear));
   MONTHS = buildFiscalMonths(selectedFiscalYear);
   syncDateBounds();
   render();
 });
-el.slotForm.addEventListener("submit", createSlot);
-el.bookingForm.addEventListener("submit", createBooking);
-el.holidayForm.addEventListener("submit", createHoliday);
+on(el.slotForm, "submit", createSlot);
+on(el.bookingForm, "submit", createBooking);
+on(el.holidayForm, "submit", createHoliday);
 
 if (sessionStorage.getItem(AUTH_KEY) === "1") unlockApp();
 else el.passwordInput.focus();
@@ -156,13 +166,19 @@ function setTab(name) {
 }
 
 function printYearOverview() {
+  if (typeof window.print !== "function") {
+    alert("เบราว์เซอร์นี้ไม่รองรับการปริ้นหน้าเว็บโดยตรง กรุณาเปิดผ่าน Chrome หรือ Safari ปกติ");
+    return;
+  }
   setTab("overview");
   if (el.printTitle) {
     el.printTitle.textContent = `LOCSee · ภาพรวม Loc Vacation ปีงบประมาณ ${selectedFiscalYear}`;
   }
   document.body.classList.add("is-printing");
   window.requestAnimationFrame(() => {
-    window.print();
+    window.requestAnimationFrame(() => {
+      window.print();
+    });
   });
 }
 
