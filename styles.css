@@ -108,6 +108,8 @@ button, input, select { font: inherit; }
 
 .login-logo { width: min(230px, 84%); }
 
+.print-title { display: none; }
+
 .hero {
   display: grid;
   justify-items: center;
@@ -167,7 +169,7 @@ button, input, select { font: inherit; }
 
 .toolbar {
   display: grid;
-  grid-template-columns: 1fr 160px 190px auto;
+  grid-template-columns: 1fr 160px 190px auto auto;
   gap: 10px;
   margin-top: 12px;
 }
@@ -608,4 +610,119 @@ h2 { margin-bottom: 10px; }
 
 @media (min-width: 700px) and (max-width: 920px) {
   .month-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ---------- Print: year overview only ---------- */
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  html, body {
+    background: white !important;
+    font-size: 11px;
+  }
+
+  body.is-printing .login-gate,
+  body.is-printing .hero,
+  body.is-printing .tabs,
+  body.is-printing .toolbar,
+  body.is-printing .legend,
+  body.is-printing .month-view,
+  body.is-printing .day-details,
+  body.is-printing .note,
+  body.is-printing .panel[data-panel="booking"],
+  body.is-printing .panel[data-panel="draw"],
+  body.is-printing .panel[data-panel="summary"] {
+    display: none !important;
+  }
+
+  body.is-printing .print-title {
+    display: block;
+    margin: 0 0 6mm;
+    font-size: 20px;
+    font-weight: 900;
+    text-align: center;
+  }
+
+  body.is-printing .app {
+    width: 100%;
+    padding: 0;
+  }
+
+  body.is-printing .panel[data-panel="overview"] {
+    margin-top: 0;
+  }
+
+  body.is-printing .section-head,
+  body.is-printing .section-head p {
+    display: none;
+  }
+
+  body.is-printing .card {
+    border: 1px solid #000 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+
+  body.is-printing .year-scroll {
+    overflow: visible !important;
+    border: none !important;
+  }
+
+  body.is-printing .year-table {
+    min-width: 0 !important;
+    width: 100%;
+    grid-template-columns: 70px repeat(31, minmax(0, 1fr));
+    gap: 1px;
+    background: #000;
+    font-size: 8px;
+    page-break-inside: avoid;
+  }
+
+  body.is-printing .year-cell {
+    min-height: 24px;
+    border-radius: 0;
+    padding: 1px;
+    color: #000 !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.is-printing .year-cell.weekend {
+    background: #ddd !important;
+  }
+
+  body.is-printing .year-cell.has-slot {
+    background: #dbe9ec !important;
+  }
+
+  body.is-printing .year-cell.has-winner {
+    background: #dcecdf !important;
+  }
+
+  body.is-printing .year-cell.has-holiday {
+    background: #f6eec2 !important;
+  }
+
+  body.is-printing .month-label {
+    position: static;
+    font-size: 9px;
+    background: #eee !important;
+  }
+
+  body.is-printing .cell-label {
+    font-size: 6.5px;
+    padding: 0 1px;
+    max-height: none;
+    background: transparent;
+    border: none;
+  }
+
+  body.is-printing .weekday-mini {
+    font-size: 7px;
+  }
 }
