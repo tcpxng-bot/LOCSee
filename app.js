@@ -72,6 +72,8 @@ const el = {
   fiscalYearSelect: document.querySelector("#fiscalYearSelect"),
   themeSelect: document.querySelector("#themeSelect"),
   reloadBtn: document.querySelector("#reloadBtn"),
+  printBtn: document.querySelector("#printBtn"),
+  printTitle: document.querySelector("#printTitle"),
   yearOverview: document.querySelector("#yearOverview"),
   monthView: document.querySelector("#monthView"),
   dayDetails: document.querySelector("#dayDetails"),
@@ -114,6 +116,7 @@ el.tabButtons.forEach(button => button.addEventListener("click", () => setTab(bu
 el.search.addEventListener("input", render);
 el.logoutBtn.addEventListener("click", logoutApp);
 el.reloadBtn.addEventListener("click", loadData);
+el.printBtn.addEventListener("click", printYearOverview);
 el.themeSelect.addEventListener("change", () => {
   applyTheme(el.themeSelect.value);
   localStorage.setItem(THEME_KEY, el.themeSelect.value);
@@ -151,6 +154,21 @@ function setTab(name) {
   el.tabButtons.forEach(button => button.classList.toggle("is-active", button.dataset.tab === name));
   el.panels.forEach(panel => panel.classList.toggle("is-active", panel.dataset.panel === name));
 }
+
+function printYearOverview() {
+  setTab("overview");
+  if (el.printTitle) {
+    el.printTitle.textContent = `LOCSee · ภาพรวม Loc Vacation ปีงบประมาณ ${selectedFiscalYear}`;
+  }
+  document.body.classList.add("is-printing");
+  window.requestAnimationFrame(() => {
+    window.print();
+  });
+}
+
+window.addEventListener("afterprint", () => {
+  document.body.classList.remove("is-printing");
+});
 
 function applySavedTheme() {
   const savedTheme = localStorage.getItem(THEME_KEY) || "soft";
