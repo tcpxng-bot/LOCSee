@@ -616,7 +616,7 @@ h2 { margin-bottom: 10px; }
 
 /* ---------- Print: year overview only ---------- */
 @page {
-  size: A4 landscape;
+  size: landscape;
   margin: 8mm;
 }
 
@@ -646,7 +646,7 @@ h2 { margin-bottom: 10px; }
   body.is-printing .print-title {
     display: block;
     margin: 0 0 3mm;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 900;
     text-align: center;
   }
@@ -655,22 +655,22 @@ h2 { margin-bottom: 10px; }
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 10px;
-    margin: 0 0 4mm;
-    font-size: 9px;
+    gap: 14px;
+    margin: 0 0 5mm;
+    font-size: 12px;
     font-weight: 700;
   }
 
   body.is-printing .print-legend span {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
   }
 
   body.is-printing .print-legend i {
     display: inline-block;
-    width: 9px;
-    height: 9px;
+    width: 12px;
+    height: 12px;
     border: 1px solid #000;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -697,38 +697,43 @@ h2 { margin-bottom: 10px; }
     background: white !important;
   }
 
+  /* The table height adapts to whatever page size/orientation the
+     browser actually prints with (rather than a fixed row height),
+     so it fills the page without leaving a big blank gap below it,
+     and without overflowing onto a second page in landscape. */
   body.is-printing .year-scroll {
     overflow: visible !important;
     border: none !important;
+    height: 88vh;
   }
 
   body.is-printing .year-table {
     min-width: 0 !important;
     width: 100%;
-    grid-template-columns: 60px repeat(31, minmax(0, 1fr));
+    height: 100%;
+    grid-template-columns: 62px repeat(31, minmax(0, 1fr));
+    grid-template-rows: repeat(13, 1fr);
     gap: 0;
     background: #fff;
     border: 1.5px solid #000;
-    font-size: 8px;
+    font-size: 11px;
     page-break-inside: avoid;
   }
 
-  /* Every cell always gets a visible black border, regardless of whether
-     the browser is set to print background colors or not, so the grid
-     never looks blank/empty on paper. */
   body.is-printing .year-cell {
     position: relative;
-    min-height: 20px;
     border: 0.5px solid #999 !important;
     border-radius: 0;
-    padding: 1px;
+    padding: 1px 2px;
     color: #000 !important;
     background: #fff !important;
+    overflow: hidden;
   }
 
   body.is-printing .day-head {
     background: #dcdcdc !important;
     font-weight: 900;
+    font-size: 12px;
     border-color: #000 !important;
   }
 
@@ -750,7 +755,7 @@ h2 { margin-bottom: 10px; }
 
   body.is-printing .month-label {
     position: static;
-    font-size: 8.5px;
+    font-size: 12px;
     background: #e6e6e6 !important;
     border-color: #000 !important;
   }
@@ -760,21 +765,25 @@ h2 { margin-bottom: 10px; }
   body.is-printing .day-num {
     display: block;
     position: absolute;
-    top: 0;
-    left: 1px;
-    font-size: 6px;
+    top: 1px;
+    left: 2px;
+    font-size: 8px;
     font-weight: 700;
     color: #444;
     line-height: 1;
   }
 
   body.is-printing .cell-label {
-    margin-top: 6px;
-    font-size: 6.5px;
-    padding: 0 1px;
+    display: block;
+    margin-top: 10px;
+    padding: 0;
     max-height: none;
     background: transparent;
     border: none;
+    white-space: pre-line;
+    word-break: break-word;
+    font-size: 9.5px;
+    line-height: 1.2;
   }
 
   body.is-printing .weekday-mini {
