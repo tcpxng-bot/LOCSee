@@ -11,6 +11,7 @@ const BOOKING_KEY = "locsee.booking.bookings";
 const HOLIDAY_KEY = "locsee.booking.holidays";
 
 const thMonthFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+const thMonthAbbr = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 const thDays = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 const monthColors = ["#a9cbd3", "#b8c7d9", "#b8d2bd", "#c8d7ad", "#e7dda5", "#e6ccb1", "#ddbea8", "#d8b293", "#d9aaa0", "#d8b7c1", "#cdb9cd", "#c4b5a8"];
 const longDate = new Intl.DateTimeFormat("th-TH-u-ca-buddhist", { day: "numeric", month: "long", year: "numeric" });
@@ -522,7 +523,7 @@ function renderYear(slotDayMap, holidayMap, query = "") {
   for (let day = 1; day <= 31; day++) cells.push(`<div class="year-cell day-head">${day}</div>`);
   MONTHS.forEach((month, index) => {
     const lastDay = new Date(month.adYear, month.month, 0).getDate();
-    cells.push(`<button class="year-cell month-label month-link" type="button" data-month-index="${index}" style="background:${monthColors[index]}">${thMonthFull[month.month - 1]} ${month.beYear}</button>`);
+    cells.push(`<button class="year-cell month-label month-link" type="button" data-month-index="${index}" style="background:${monthColors[index]}"><span class="month-full">${thMonthFull[month.month - 1]} ${month.beYear}</span><span class="month-abbr">${thMonthAbbr[month.month - 1]} ${String(month.beYear).slice(-2)}</span></button>`);
     for (let day = 1; day <= 31; day++) {
       if (day > lastDay) { cells.push(`<div class="year-cell invalid"></div>`); continue; }
       const date = new Date(month.adYear, month.month - 1, day);

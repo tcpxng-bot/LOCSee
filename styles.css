@@ -272,6 +272,8 @@ h2 { margin-bottom: 10px; }
 
 .month-link:hover { filter: brightness(.96); }
 
+.month-abbr { display: none; }
+
 .day-head { background: #bde8f5; font-weight: 900; }
 .invalid { background: #f1eadc; color: transparent; opacity: .55; }
 .has-slot { background: var(--blue); font-weight: 900; cursor: pointer; }
@@ -758,6 +760,14 @@ h2 { margin-bottom: 10px; }
     font-size: 12px;
     background: #e6e6e6 !important;
     border-color: #000 !important;
+  }
+
+  body.is-printing .month-full {
+    display: none;
+  }
+
+  body.is-printing .month-abbr {
+    display: inline;
   }
 
   /* Day-of-month number shown in every cell during print only, so days
