@@ -167,24 +167,222 @@ function setTab(name) {
 }
 
 function printYearOverview() {
+  const picker = document.querySelector("#printPicker");
+  if (!picker) { openPrintPreview("timeline"); return; }
+  picker.hidden = false;
+  picker.querySelector("[data-print-layout]")?.focus();
+}
+
+function closePrintPicker() {
+  const picker = document.querySelector("#printPicker");
+  if (picker) picker.hidden = true;
+}
+
+document.querySelectorAll("[data-print-layout]").forEach(button => button.addEventListener("click", () => {
+  closePrintPicker();
+  openPrintPreview(button.dataset.printLayout);
+}));
+on(document.querySelector("#printPickerCancel"), "click", closePrintPicker);
+on(document.querySelector("#printPicker"), "click", event => { if (event.target.id === "printPicker") closePrintPicker(); });
+on(document.querySelector("#printCloseBtn"), "click", closePrintPreview);
+on(document.querySelector("#printNowBtn"), "click", () => {
   if (typeof window.print !== "function") {
     alert("เบราว์เซอร์นี้ไม่รองรับการปริ้นหน้าเว็บโดยตรง กรุณาเปิดผ่าน Chrome หรือ Safari ปกติ");
     return;
   }
-  setTab("overview");
-  if (el.printTitle) {
-    el.printTitle.textContent = `LOCSee · ภาพรวม Loc Vacation ปีงบประมาณ ${selectedFiscalYear}`;
-  }
+  window.print();
+});
+window.addEventListener("resize", () => { if (document.body.classList.contains("is-printing")) scalePrintPages(); });
+
+function openPrintPreview(layout) {
+  const pages = document.querySelector("#printPages");
+  if (!pages) return;
+  const html = [];
+  if (layout === "timeline" || layout === "both") html.push(printPageShell(`ภาพรวม Loc Vacation ปีงบประมาณ ${selectedFiscalYear}`, buildPrintTimeline()));
+  if (layout === "calendar" || layout === "both") html.push(printPageShell(`ปฏิทิน Loc Vacation ปีงบประมาณ ${selectedFiscalYear}`, buildPrintCalendar()));
+  pages.innerHTML = html.map(page => `<div class="pp-wrap">${page}</div>`).join("");
   document.body.classList.add("is-printing");
-  window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(() => {
-      window.print();
-    });
+  window.scrollTo(0, 0);
+  scalePrintPages();
+  fitPrintNames();
+  if (document.fonts?.ready) document.fonts.ready.then(fitPrintNames);
+}
+
+function closePrintPreview() {
+  document.body.classList.remove("is-printing");
+  const pages = document.querySelector("#printPages");
+  if (pages) pages.innerHTML = "";
+}
+
+function scalePrintPages() {
+  const avail = Math.max(200, document.documentElement.clientWidth - 24);
+  document.querySelectorAll(".pp-wrap").forEach(wrap => {
+    const page = wrap.querySelector(".print-page");
+    const scale = Math.min(1, avail / page.offsetWidth);
+    page.style.transform = `scale(${scale})`;
+    wrap.style.width = `${page.offsetWidth * scale}px`;
+    wrap.style.height = `${page.offsetHeight * scale}px`;
   });
 }
 
-window.addEventListener("afterprint", () => {
-  document.body.classList.remove("is-printing");
+function fitPrintNames() {
+  document.querySelectorAll(".print-page .pbar").forEach(bar => {
+    const name = bar.querySelector(".pname");
+    const maxFont = Number(bar.dataset.maxFont || 17);
+    const minFont = Number(bar.dataset.minFont || 11);
+    const wrap = bar.dataset.wrap === "1";
+    bar.classList.remove("spill", "spill-left");
+    name.classList.toggle("nowrap", !wrap);
+    let size = maxFont;
+    name.style.fontSize = `${size}px`;
+    const overflowing = () => name.scrollWidth > name.clientWidth + 1 || (wrap && name.scrollHeight > name.clientHeight + 2);
+    while (overflowing() && size > minFont) {
+      size -= 0.5;
+      name.style.fontSize = `${size}px`;
+    }
+    if (overflowing()) {
+      name.style.fontSize = `${Math.min(13, maxFont)}px`;
+      bar.classList.add("spill");
+      if (bar.dataset.edge === "right") bar.classList.add("spill-left");
+    }
+  });
+}
+
+function printPageShell(title, body) {
+  const now = new Date();
+  const printed = `${now.getDate()} ${thMonthAbbr[now.getMonth()]} ${now.getFullYear() + 543}`;
+  return `<article class="print-page">
+    <header class="ps-head">
+      <img class="ps-logo" src="./assets/locsee-logo.png" alt="LOCSee">
+      <h2 class="ps-title">${escapeHtml(title)}</h2>
+      <div class="ps-legend">
+        <span><i class="lg-open"></i>เปิดจอง (ยังไม่จับฉลาก)</span>
+        <span><i class="lg-won"></i>จับฉลากแล้ว</span>
+        <span><i class="lg-hol"></i>วันหยุดพิเศษ</span>
+        <span><i class="lg-we"></i>เสาร์-อาทิตย์</span>
+      </div>
+    </header>
+    <div class="ps-body">${body}</div>
+    <footer class="ps-foot"><span>${escapeHtml(location.host + location.pathname)}</span><span>พิมพ์เมื่อ ${printed}</span></footer>
+  </article>`;
+}
+
+function printSlotLabel(slot) {
+  if (slot.status === "drawn" && slot.winner_name) return splitWinners(slot.winner_name).join(", ");
+  const names = uniqueNames(bookings.filter(item => item.slot_id === slot.id).map(item => item.person_name || ""));
+  if (!names.length) return "ยังไม่มีผู้จอง";
+  return names.length <= 3 ? names.join(", ") : `${names.slice(0, 3).join(", ")} +${names.length - 3}`;
+}
+
+// แบ่ง Loc ในเดือนนั้นเป็นช่วงวันทำการติดกัน (ตัดเสาร์-อาทิตย์ออก)
+function printMonthSegments(month) {
+  const days = new Date(month.adYear, month.month, 0).getDate();
+  const monthStart = `${month.adYear}-${String(month.month).padStart(2, "0")}-01`;
+  const monthEnd = `${month.adYear}-${String(month.month).padStart(2, "0")}-${String(days).padStart(2, "0")}`;
+  const segments = [];
+  slots
+    .filter(slot => overlapsFiscalYear(slot.start_date, slot.end_date) && slot.start_date <= monthEnd && slot.end_date >= monthStart)
+    .forEach(slot => {
+      const from = slot.start_date > monthStart ? slot.start_date : monthStart;
+      const to = slot.end_date < monthEnd ? slot.end_date : monthEnd;
+      let runStart = null;
+      for (let date = new Date(`${from}T00:00:00`); iso(date) <= to; date.setDate(date.getDate() + 1)) {
+        const d = date.getDate();
+        if (isWeekendDate(date)) {
+          if (runStart !== null) { segments.push({ s: runStart, e: d - 1, slot }); runStart = null; }
+        } else if (runStart === null) runStart = d;
+      }
+      if (runStart !== null) segments.push({ s: runStart, e: Number(to.slice(8, 10)), slot });
+    });
+  return segments.sort((a, b) => a.s - b.s || b.e - a.e);
+}
+
+function assignPrintLanes(segments) {
+  const laneEnds = [];
+  segments.forEach(seg => {
+    let lane = laneEnds.findIndex(end => end < seg.s);
+    if (lane === -1) { lane = laneEnds.length; laneEnds.push(seg.e); } else laneEnds[lane] = seg.e;
+    seg.lane = lane;
+  });
+  return Math.max(1, laneEnds.length);
+}
+
+function printBar(seg, month, holidayMap, gridColumn, gridRow, maxFont, edge, wrap = false) {
+  const parts = [];
+  for (let d = seg.s; d <= seg.e; d++) {
+    const key = `${month.adYear}-${String(month.month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    parts.push(`<span class="pseg${holidayMap.has(key) ? " hol" : ""}"></span>`);
+  }
+  const status = seg.slot.status === "drawn" ? "drawn" : "open";
+  return `<div class="pbar ${status}" data-max-font="${maxFont}" data-edge="${edge}" data-wrap="${wrap ? 1 : 0}" style="grid-column:${gridColumn};grid-row:${gridRow}"><span class="psegs">${parts.join("")}</span><span class="pname">${escapeHtml(printSlotLabel(seg.slot))}</span></div>`;
+}
+
+function buildPrintTimeline() {
+  const holidayMap = groupHolidays();
+  let html = `<div class="pt"><div class="pt-head"><div class="pt-hd">เดือน</div>`;
+  for (let d = 1; d <= 31; d++) html += `<div class="pt-hd">${d}</div>`;
+  html += `</div>`;
+  MONTHS.forEach(month => {
+    const days = new Date(month.adYear, month.month, 0).getDate();
+    const segments = printMonthSegments(month);
+    const lanes = assignPrintLanes(segments);
+    html += `<div class="pt-row${lanes > 1 ? " multi" : ""}" style="grid-template-rows:repeat(${lanes}, minmax(0, 1fr))">`;
+    html += `<div class="pt-mo">${thMonthAbbr[month.month - 1]} ${String(month.beYear).slice(-2)}</div>`;
+    for (let d = 1; d <= 31; d++) {
+      let cls = "pt-c";
+      if (d > days) cls += " void";
+      else {
+        const date = new Date(month.adYear, month.month - 1, d);
+        if (holidayMap.has(iso(date))) cls += " hol";
+        else if (isWeekendDate(date)) cls += " we";
+      }
+      html += `<div class="${cls}" style="grid-column:${d + 1}"></div>`;
+    }
+    segments.forEach(seg => {
+      html += printBar(seg, month, holidayMap, `${seg.s + 1} / span ${seg.e - seg.s + 1}`, seg.lane + 1, lanes > 1 ? 13 : 17, seg.s >= 27 ? "right" : "left", lanes === 1 && seg.e > seg.s);
+    });
+    html += `</div>`;
+  });
+  return html + `</div>`;
+}
+
+function buildPrintCalendar() {
+  const holidayMap = groupHolidays();
+  const weekdayHead = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"].map(name => `<span>${name}</span>`).join("");
+  let html = `<div class="pc">`;
+  MONTHS.forEach(month => {
+    const days = new Date(month.adYear, month.month, 0).getDate();
+    const offset = (new Date(month.adYear, month.month - 1, 1).getDay() + 6) % 7;
+    const weekCount = Math.ceil((offset + days) / 7);
+    const segments = printMonthSegments(month);
+    html += `<section class="pc-m"><h3>${thMonthFull[month.month - 1]} ${month.beYear}</h3><div class="pc-wd">${weekdayHead}</div><div class="pc-weeks">`;
+    for (let w = 0; w < weekCount; w++) {
+      const weekSegs = segments
+        .filter(seg => Math.floor((offset + seg.s - 1) / 7) === w)
+        .map(seg => ({ ...seg }));
+      const lanes = assignPrintLanes(weekSegs);
+      html += `<div class="pc-w" style="grid-template-rows:12px repeat(${lanes}, minmax(0, 1fr))">`;
+      for (let c = 0; c < 7; c++) {
+        const d = w * 7 + c - offset + 1;
+        if (d < 1 || d > days) { html += `<div class="pc-d" style="grid-column:${c + 1}"></div>`; continue; }
+        const date = new Date(month.adYear, month.month - 1, d);
+        const cls = holidayMap.has(iso(date)) ? " hol" : isWeekendDate(date) ? " we" : "";
+        html += `<div class="pc-d${cls}" style="grid-column:${c + 1}"><b>${d}</b></div>`;
+      }
+      weekSegs.forEach(seg => {
+        const col = (offset + seg.s - 1) % 7 + 1;
+        html += printBar(seg, month, holidayMap, `${col} / span ${seg.e - seg.s + 1}`, seg.lane + 2, lanes > 1 ? 11 : 14, col >= 5 ? "right" : "left");
+      });
+      html += `</div>`;
+    }
+    html += `</div></section>`;
+  });
+  return html + `</div>`;
+}
+
+window.addEventListener("keydown", event => {
+  if (event.key !== "Escape") return;
+  closePrintPicker();
 });
 
 function applySavedTheme() {
