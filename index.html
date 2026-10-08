@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LOCSee Booking</title>
-  <link rel="stylesheet" href="./styles.css?v=3">
+  <link rel="stylesheet" href="./styles.css?v=4">
 </head>
 <body>
   <section class="login-gate" id="loginGate">
@@ -19,13 +19,6 @@
   </section>
 
   <main class="app is-locked" id="appShell">
-    <p class="print-title" id="printTitle"></p>
-    <div class="print-legend">
-      <span><i style="background:#bfe0e8"></i>Loc เปิดจอง</span>
-      <span><i style="background:#c3e6cb"></i>จับฉลากแล้ว</span>
-      <span><i style="background:#f5e59a"></i>วันหยุดพิเศษ</span>
-      <span><i style="background:#e2e2e2"></i>เสาร์-อาทิตย์</span>
-    </div>
 
     <header class="hero card">
       <img class="brand-logo" src="./assets/locsee-logo.png" alt="LOCSee">
@@ -50,7 +43,7 @@
         <option value="contrast">ธีม High Contrast</option>
       </select>
       <button class="btn" id="reloadBtn" type="button">รีเฟรช</button>
-      <button class="btn" id="printBtn" type="button" title="ปริ้นภาพรวมทั้งปีงบประมาณ">🖨️ ปริ้นภาพรวมทั้งปี</button>
+      <button class="btn" id="printBtn" type="button" title="ปริ้นภาพรวมทั้งปีงบประมาณ">🖨️ ปริ้น</button>
     </section>
 
     <section class="panel is-active" data-panel="overview">
@@ -138,8 +131,28 @@
     <p class="note" id="note"></p>
   </main>
 
+  <div class="print-picker" id="printPicker" hidden>
+    <div class="print-picker-card card" role="dialog" aria-modal="true" aria-labelledby="printPickerTitle">
+      <h2 id="printPickerTitle">เลือกแบบที่จะปริ้น</h2>
+      <button class="btn primary" type="button" data-print-layout="timeline">ภาพรวมแถบยาว (1 หน้า)</button>
+      <button class="btn primary" type="button" data-print-layout="calendar">ปฏิทินรายเดือน (1 หน้า)</button>
+      <button class="btn primary" type="button" data-print-layout="both">ทั้งสองแบบ (2 หน้า)</button>
+      <button class="btn ghost" type="button" id="printPickerCancel">ยกเลิก</button>
+      <small>ออกแบบสำหรับกระดาษ Legal แนวนอน</small>
+    </div>
+  </div>
+
+  <section class="print-sheet" id="printSheet" aria-label="ตัวอย่างก่อนปริ้น">
+    <div class="print-sheet-bar">
+      <button class="btn primary" type="button" id="printNowBtn">🖨️ สั่งปริ้น</button>
+      <button class="btn ghost" type="button" id="printCloseBtn">ปิดตัวอย่าง</button>
+      <small>ตอนสั่งปริ้น เลือกขนาดกระดาษเป็น Legal</small>
+    </div>
+    <div class="print-pages" id="printPages"></div>
+  </section>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js"></script>
-  <script src="./app.js?v=3"></script>
+  <script src="./app.js?v=4"></script>
 </body>
 </html>
