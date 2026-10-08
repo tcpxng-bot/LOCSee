@@ -616,187 +616,132 @@ h2 { margin-bottom: 10px; }
   .month-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-/* ---------- Print: year overview only ---------- */
-@page {
-  size: landscape;
-  margin: 8mm;
+/* ---------- Print: picker + preview + pages (Legal landscape) ---------- */
+.print-picker {
+  position: fixed; inset: 0; z-index: 50;
+  display: grid; place-items: center;
+  padding: 16px;
+  background: rgba(30, 30, 35, .45);
 }
+.print-picker[hidden] { display: none; }
+.print-picker-card {
+  width: min(360px, 100%);
+  display: grid; gap: 10px;
+  padding: 20px;
+  text-align: center;
+}
+.print-picker-card h2 { margin: 0 0 4px; }
+.print-picker-card small { color: var(--muted); }
+
+.print-sheet { display: none; }
+body.is-printing { background: var(--bg); }
+body.is-printing > :not(.print-sheet):not(script) { display: none !important; }
+body.is-printing .print-sheet { display: block; padding: 12px 12px 32px; }
+.print-sheet-bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  max-width: 900px; margin: 0 auto 12px; padding: 10px 0;
+  background: var(--bg);
+}
+.print-sheet-bar small { color: var(--muted); }
+.pp-wrap { position: relative; margin: 0 auto 16px; }
+
+.print-page {
+  position: absolute; top: 0; left: 0;
+  width: 14in; height: 8.5in;
+  padding: .35in .4in .3in;
+  display: flex; flex-direction: column;
+  background: #fff; color: var(--ink);
+  transform-origin: top left;
+  box-shadow: 0 6px 24px rgba(0,0,0,.18);
+  overflow: hidden;
+}
+.print-page, .print-page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+.ps-head {
+  display: flex; align-items: center; gap: 18px;
+  padding-bottom: 10px; margin-bottom: 10px;
+  border-bottom: 2px solid var(--line);
+}
+.ps-logo { height: 58px; width: auto; margin: -8px 0; }
+.ps-title { margin: 0; font-size: 26px; font-weight: 800; }
+.ps-legend { margin-left: auto; display: flex; gap: 14px; font-size: 15px; font-weight: 700; }
+.ps-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ps-legend i { width: 16px; height: 16px; border: 2px solid var(--line); border-radius: 4px; display: inline-block; }
+.ps-legend .lg-open { background: var(--blue); border-style: dashed; }
+.ps-legend .lg-won { background: var(--green); }
+.ps-legend .lg-hol { background: var(--yellow); }
+.ps-legend .lg-we { background: color-mix(in srgb, var(--line) 10%, #fff); }
+.ps-foot { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.ps-body { flex: 1; min-height: 0; }
+
+/* shared bar */
+.pbar {
+  position: relative; z-index: 2;
+  display: flex;
+  margin: 3px 2px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 2px 2px 0 var(--shadow);
+  min-height: 0;
+}
+.pbar .psegs { position: absolute; inset: 0; display: flex; border-radius: 6px; overflow: hidden; }
+.pbar .pseg { flex: 1; background: var(--green); }
+.pbar.open { border-style: dashed; }
+.pbar.open .pseg { background: var(--blue); }
+.pbar .pseg.hol { background: var(--yellow); }
+.pbar .pname {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+  text-align: center; line-height: 1.1;
+  font-weight: 800; color: var(--ink);
+}
+.pbar .pname.nowrap { white-space: nowrap; line-height: 1; }
+.pbar.spill .pname {
+  inset: auto; display: block; line-height: 1.2; top: 50%; left: calc(100% + 3px);
+  transform: translateY(-50%);
+  white-space: nowrap; overflow: visible;
+  padding: 0 4px;
+  background: var(--card);
+  border-radius: 4px;
+  z-index: 3;
+}
+.pbar.spill.spill-left .pname { left: auto; right: calc(100% + 3px); }
+
+/* timeline */
+.pt { height: 100%; display: flex; flex-direction: column; border: 2px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card); box-shadow: 4px 4px 0 var(--shadow); }
+.pt-head, .pt-row { display: grid; grid-template-columns: 74px repeat(31, minmax(0, 1fr)); }
+.pt-head { flex: 0 0 28px; }
+.pt-row { flex: 1; min-height: 0; }
+.pt-hd { display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; background: var(--cream); border-bottom: 2px solid var(--line); border-right: 1px solid color-mix(in srgb, var(--line) 20%, transparent); }
+.pt-hd:first-child, .pt-mo { border-right: 2px solid var(--line); }
+.pt-mo { grid-column: 1; grid-row: 1 / -1; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800; background: var(--cream); border-bottom: 1px solid color-mix(in srgb, var(--line) 25%, transparent); }
+.pt-c { grid-row: 1 / -1; border-right: 1px solid color-mix(in srgb, var(--line) 14%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 25%, transparent); }
+.pt-c.we, .pc-d.we { background: color-mix(in srgb, var(--line) 10%, #fff); }
+.pt-c.hol, .pc-d.hol { background: color-mix(in srgb, var(--yellow) 70%, #fff); }
+.pt-c.void { background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--line) 12%, transparent) 4px 5px); }
+.pt-row .pbar { margin: 5px 2px; }
+.pt-row.multi .pbar { margin: 2px 2px; }
+
+/* monthly calendars */
+.pc { height: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pc-m { display: flex; flex-direction: column; min-height: 0; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); box-shadow: 3px 3px 0 var(--shadow); }
+.pc-m h3 { margin: 0; padding: 0 10px; font-size: 16px; font-weight: 800; background: var(--cream); border-bottom: 2px solid var(--line); }
+.pc-wd { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); font-size: 11px; line-height: 1.3; font-weight: 800; text-align: center; border-bottom: 1px solid color-mix(in srgb, var(--line) 25%, transparent); }
+.pc-weeks { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.pc-w { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.pc-d { position: relative; grid-row: 1 / -1; border-right: 1px solid color-mix(in srgb, var(--line) 10%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 12%, transparent); }
+.pc-d b { position: absolute; top: 1px; left: 3px; font-size: 10.5px; line-height: 1; color: var(--muted); }
+.pc-w .pbar { margin: 0 2px 2px; border-width: 1.5px; border-radius: 6px; box-shadow: 1.5px 1.5px 0 var(--shadow); }
+
+@page { size: legal landscape; margin: 0; }
 
 @media print {
-  html, body {
-    background: white !important;
-    font-size: 11px;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    color-adjust: exact;
-  }
-
-  body.is-printing .login-gate,
-  body.is-printing .hero,
-  body.is-printing .tabs,
-  body.is-printing .toolbar,
-  body.is-printing .legend,
-  body.is-printing .month-view,
-  body.is-printing .day-details,
-  body.is-printing .note,
-  body.is-printing .panel[data-panel="booking"],
-  body.is-printing .panel[data-panel="draw"],
-  body.is-printing .panel[data-panel="summary"] {
-    display: none !important;
-  }
-
-  body.is-printing .print-title {
-    display: block;
-    margin: 0 0 3mm;
-    font-size: 20px;
-    font-weight: 900;
-    text-align: center;
-  }
-
-  body.is-printing .print-legend {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 14px;
-    margin: 0 0 5mm;
-    font-size: 12px;
-    font-weight: 700;
-  }
-
-  body.is-printing .print-legend span {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-  }
-
-  body.is-printing .print-legend i {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border: 1px solid #000;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  body.is-printing .app {
-    width: 100%;
-    padding: 0;
-  }
-
-  body.is-printing .panel[data-panel="overview"] {
-    margin-top: 0;
-  }
-
-  body.is-printing .section-head,
-  body.is-printing .section-head p {
-    display: none;
-  }
-
-  body.is-printing .card {
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    background: white !important;
-  }
-
-  /* The table height adapts to whatever page size/orientation the
-     browser actually prints with (rather than a fixed row height),
-     so it fills the page without leaving a big blank gap below it,
-     and without overflowing onto a second page in landscape. */
-  body.is-printing .year-scroll {
-    overflow: visible !important;
-    border: none !important;
-    height: 88vh;
-  }
-
-  body.is-printing .year-table {
-    min-width: 0 !important;
-    width: 100%;
-    height: 100%;
-    grid-template-columns: 62px repeat(31, minmax(0, 1fr));
-    grid-template-rows: repeat(13, 1fr);
-    gap: 0;
-    background: #fff;
-    border: 1.5px solid #000;
-    font-size: 11px;
-    page-break-inside: avoid;
-  }
-
-  body.is-printing .year-cell {
-    position: relative;
-    border: 0.5px solid #999 !important;
-    border-radius: 0;
-    padding: 1px 2px;
-    color: #000 !important;
-    background: #fff !important;
-    overflow: hidden;
-  }
-
-  body.is-printing .day-head {
-    background: #dcdcdc !important;
-    font-weight: 900;
-    font-size: 12px;
-    border-color: #000 !important;
-  }
-
-  body.is-printing .year-cell.weekend {
-    background: #e2e2e2 !important;
-  }
-
-  body.is-printing .year-cell.has-slot {
-    background: #bfe0e8 !important;
-  }
-
-  body.is-printing .year-cell.has-winner {
-    background: #c3e6cb !important;
-  }
-
-  body.is-printing .year-cell.has-holiday {
-    background: #f5e59a !important;
-  }
-
-  body.is-printing .month-label {
-    position: static;
-    font-size: 12px;
-    background: #e6e6e6 !important;
-    border-color: #000 !important;
-  }
-
-  body.is-printing .month-full {
-    display: none;
-  }
-
-  body.is-printing .month-abbr {
-    display: inline;
-  }
-
-  /* Day-of-month number shown in every cell during print only, so days
-     with no booking/holiday still show something instead of looking empty. */
-  body.is-printing .day-num {
-    display: block;
-    position: absolute;
-    top: 1px;
-    left: 2px;
-    font-size: 8px;
-    font-weight: 700;
-    color: #444;
-    line-height: 1;
-  }
-
-  body.is-printing .cell-label {
-    display: block;
-    margin-top: 10px;
-    padding: 0;
-    max-height: none;
-    background: transparent;
-    border: none;
-    white-space: pre-line;
-    word-break: break-word;
-    font-size: 9.5px;
-    line-height: 1.2;
-  }
-
-  body.is-printing .weekday-mini {
-    display: none;
-  }
+  body.is-printing { background: #fff !important; }
+  body.is-printing .print-sheet { padding: 0; }
+  .print-sheet-bar { display: none !important; }
+  .pp-wrap { width: auto !important; height: auto !important; margin: 0 !important; break-after: page; page-break-after: always; }
+  .pp-wrap:last-child { break-after: auto; page-break-after: auto; }
+  .print-page { position: relative; transform: none !important; box-shadow: none; }
 }
