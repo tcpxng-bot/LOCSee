@@ -9,6 +9,19 @@ const TOTAL_ALLOWANCE_DAYS = VACATION_ALLOWANCE_DAYS + HOSPITAL_ALLOWANCE_DAYS;
 const VAC_KEY = "locsee.booking.slots";
 const BOOKING_KEY = "locsee.booking.bookings";
 const HOLIDAY_KEY = "locsee.booking.holidays";
+const USER_KEY = "locsee.booking.user";
+const STAFF_LOCAL_KEY = "locsee.booking.staff";
+const LOG_LOCAL_KEY = "locsee.booking.log";
+const SWAP_LOCAL_KEY = "locsee.booking.swaps";
+// ใช้เฉพาะโหมดทดลองในเครื่อง (ไม่มี Supabase) — ของจริงอยู่ในตาราง staff บน Supabase
+const STAFF_SEED = [
+  ["พจนา", "พจนา ศรีคำจักร์"], ["ฐิติพร", "ฐิติพร เหมี้ยงหอม"], ["มณฑิชา", "มณฑิชา ทองทิพย์"],
+  ["ช่อผกา", "ช่อผกา สารวัตร"], ["โสภิดา", "โสภิดา ธรรมชัยกูล"], ["ชนกานต์", "ชนกานต์ คาบเพ็ชร"],
+  ["รุจิรา", "รุจิรา เครื่องสาย"], ["พรชิตา", "พรชิตา ยาวิชัย", true], ["ภัคคนันทน์", "ภัคคนันทน์ บุญทรง"],
+  ["รัชพร", "รัชพร ศรีเขื่อนแก้ว"], ["กุลสตรี", "กุลสตรี ชัยยานนท์"], ["จิรปาน", "จิรปาน ปัญจะเรือง"],
+  ["ณัฎฐาภรณ์", "ณัฎฐาภรณ์ บุญศรีไหว"], ["เสาวภา", "เสาวภา รักสกุลดี"], ["แสงดาว", "แสงดาว เชื้อพูล"],
+  ["วิสสุตา", "วิสสุตา เปาวะ"], ["อรวรรณ", "อรวรรณ"], ["อัมพันธ์", "อัมพันธ์"]
+];
 
 const thMonthFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 const thMonthAbbr = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -30,7 +43,23 @@ const BASE_HOLIDAYS = [
   ["2027-05-20", "วันหยุดพิเศษ"],
   ["2027-06-03", "วันหยุดพิเศษ"],
   ["2027-07-19", "วันหยุดพิเศษ"],
-  ["2027-07-28", "วันหยุดพิเศษ"]
+  ["2027-07-28", "วันหยุดพิเศษ"],
+  // ปีงบ 2571 (ต.ค. 70 – ก.ย. 71): วันหยุดวันที่ตายตัว + วันชดเชย · วันหยุดทางพุทธศาสนาให้เพิ่มเองในแท็บสรุป
+  ["2027-10-13", "วันคล้ายวันสวรรคต ร.9"],
+  ["2027-10-25", "ชดเชยวันปิยมหาราช"],
+  ["2027-12-06", "ชดเชยวันพ่อแห่งชาติ"],
+  ["2027-12-10", "วันรัฐธรรมนูญ"],
+  ["2027-12-31", "วันสิ้นปี"],
+  ["2028-01-03", "ชดเชยวันขึ้นปีใหม่"],
+  ["2028-04-06", "วันจักรี"],
+  ["2028-04-13", "วันสงกรานต์"],
+  ["2028-04-14", "วันสงกรานต์"],
+  ["2028-04-17", "ชดเชยวันสงกรานต์"],
+  ["2028-05-01", "วันแรงงาน"],
+  ["2028-05-04", "วันฉัตรมงคล"],
+  ["2028-06-05", "ชดเชยวันเฉลิมฯ พระราชินี"],
+  ["2028-07-28", "วันเฉลิมฯ ร.10"],
+  ["2028-08-14", "ชดเชยวันแม่แห่งชาติ"]
 ];
 
 const cfg = window.LOCVAC_SUPABASE || {};
@@ -47,6 +76,12 @@ let maxDate = "";
 let slots = [];
 let bookings = [];
 let customHolidays = [];
+let currentUser = null;      // { name, isAdmin }
+let sessionPin = "";         // PIN ของรอบนี้ เก็บในหน่วยความจำเท่านั้น ใช้กับงานผู้ดูแล
+let staffNames = [];         // [{ short_name, has_pin }]
+let loginName = "";
+let swapRequests = [];       // คำขอแลก Loc จากตาราง swap_requests
+let swapPickFor = null;      // id ของ Loc ที่กำลังเลือกคนจะแลกด้วย
 
 function normalizeSupabaseUrl(rawUrl) {
   const value = String(rawUrl || "").trim();
@@ -95,7 +130,32 @@ const el = {
   holidaySummary: document.querySelector("#holidaySummary"),
   holidayName: document.querySelector("#holidayName"),
   holidayDate: document.querySelector("#holidayDate"),
-  note: document.querySelector("#note")
+  note: document.querySelector("#note"),
+  nameForm: document.querySelector("#nameForm"),
+  nameSelect: document.querySelector("#nameSelect"),
+  nameMessage: document.querySelector("#nameMessage"),
+  pinForm: document.querySelector("#pinForm"),
+  pinTitle: document.querySelector("#pinTitle"),
+  pinHint: document.querySelector("#pinHint"),
+  pinInput: document.querySelector("#pinInput"),
+  pinConfirm: document.querySelector("#pinConfirm"),
+  pinSubmit: document.querySelector("#pinSubmit"),
+  pinMessage: document.querySelector("#pinMessage"),
+  rememberMe: document.querySelector("#rememberMe"),
+  forgotPinBtn: document.querySelector("#forgotPinBtn"),
+  mePill: document.querySelector("#mePill"),
+  bookingNameHint: document.querySelector("#bookingNameHint"),
+  mineTitle: document.querySelector("#mineTitle"),
+  mineList: document.querySelector("#mineList"),
+  adminUnlockForm: document.querySelector("#adminUnlockForm"),
+  adminPinInput: document.querySelector("#adminPinInput"),
+  staffList: document.querySelector("#staffList"),
+  staffForm: document.querySelector("#staffForm"),
+  staffShort: document.querySelector("#staffShort"),
+  staffFull: document.querySelector("#staffFull"),
+  logList: document.querySelector("#logList"),
+  drawOverlay: document.querySelector("#drawOverlay"),
+  toast: document.querySelector("#toast")
 };
 
 console.log("[LOCSee] app.js loaded (มีปุ่มปริ้น):", Boolean(el.printBtn));
@@ -108,7 +168,8 @@ el.loginForm.addEventListener("submit", event => {
   event.preventDefault();
   if (el.passwordInput.value === APP_PASSWORD) {
     sessionStorage.setItem(AUTH_KEY, "1");
-    unlockApp();
+    el.loginMessage.textContent = "";
+    showNameStep();
   } else {
     el.loginMessage.textContent = "รหัสผ่านไม่ถูกต้อง";
     el.passwordInput.select();
@@ -143,27 +204,177 @@ on(el.slotForm, "submit", createSlot);
 on(el.bookingForm, "submit", createBooking);
 on(el.holidayForm, "submit", createHoliday);
 
-if (sessionStorage.getItem(AUTH_KEY) === "1") unlockApp();
-else el.passwordInput.focus();
+on(el.nameForm, "submit", submitName);
+on(el.pinForm, "submit", submitPin);
+on(el.forgotPinBtn, "click", () => { el.pinMessage.textContent = "แจ้งผู้ดูแล (พรชิตา) ให้รีเซ็ต PIN แล้วกลับมาตั้งใหม่ได้เลย"; });
+document.querySelectorAll("[data-login-back]").forEach(button => button.addEventListener("click", () => showLoginStep(button.dataset.loginBack)));
+
+function restoreSession() {
+  const saved = readStoredUser();
+  if (saved && (sessionStorage.getItem(AUTH_KEY) === "1" || saved.remember)) {
+    sessionStorage.setItem(AUTH_KEY, "1");
+    currentUser = { name: saved.name, isAdmin: Boolean(saved.isAdmin) };
+    unlockApp();
+  } else if (sessionStorage.getItem(AUTH_KEY) === "1") {
+    showNameStep();
+  } else {
+    el.passwordInput.focus();
+  }
+}
+
+function readStoredUser() {
+  try {
+    const raw = sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function storeUser(remember) {
+  const value = JSON.stringify({ ...currentUser, remember });
+  try {
+    sessionStorage.setItem(USER_KEY, value);
+    if (remember) localStorage.setItem(USER_KEY, value);
+    else localStorage.removeItem(USER_KEY);
+  } catch {}
+}
+
+function showLoginStep(id) {
+  [el.loginForm, el.nameForm, el.pinForm].forEach(form => { if (form) form.hidden = form.id !== id; });
+  const first = document.getElementById(id)?.querySelector("input:not([hidden]), select");
+  first?.focus();
+}
+
+async function showNameStep() {
+  showLoginStep("nameForm");
+  el.nameSelect.innerHTML = `<option value="">กำลังโหลดรายชื่อ...</option>`;
+  el.nameMessage.textContent = "";
+  try {
+    staffNames = await staffApi.list();
+    el.nameSelect.innerHTML = `<option value="">— เลือกชื่อ —</option>` + staffNames.map(item =>
+      `<option value="${escapeHtml(item.short_name)}">${escapeHtml(item.short_name)}${item.has_pin ? "" : " (ยังไม่ตั้ง PIN)"}</option>`
+    ).join("");
+  } catch (error) {
+    el.nameSelect.innerHTML = `<option value="">โหลดรายชื่อไม่สำเร็จ</option>`;
+    el.nameMessage.textContent = staffErrorText(error);
+  }
+}
+
+function submitName(event) {
+  event.preventDefault();
+  loginName = el.nameSelect.value;
+  if (!loginName) { el.nameMessage.textContent = "กรุณาเลือกชื่อของคุณ"; return; }
+  const person = staffNames.find(item => item.short_name === loginName);
+  const firstTime = !person?.has_pin;
+  el.pinTitle.textContent = firstTime ? `ตั้ง PIN ของ ${loginName}` : `สวัสดี ${loginName}`;
+  el.pinHint.textContent = firstTime
+    ? "ครั้งแรก ตั้ง PIN เป็นตัวเลข 4–6 หลักที่จำได้ ใช้ทุกครั้งที่เข้าสู่ระบบ"
+    : "ใส่ PIN ของคุณ";
+  el.pinConfirm.hidden = !firstTime;
+  el.forgotPinBtn.hidden = firstTime;
+  el.pinSubmit.textContent = firstTime ? "ตั้ง PIN และเข้าสู่ระบบ" : "เข้าสู่ระบบ";
+  el.pinForm.dataset.mode = firstTime ? "set" : "login";
+  el.pinInput.value = "";
+  el.pinConfirm.value = "";
+  el.pinMessage.textContent = "";
+  showLoginStep("pinForm");
+}
+
+async function submitPin(event) {
+  event.preventDefault();
+  const pin = el.pinInput.value.trim();
+  el.pinSubmit.disabled = true;
+  try {
+    let result;
+    if (el.pinForm.dataset.mode === "set") {
+      if (!/^\d{4,6}$/.test(pin)) { el.pinMessage.textContent = "PIN ต้องเป็นตัวเลข 4–6 หลัก"; return; }
+      if (pin !== el.pinConfirm.value.trim()) { el.pinMessage.textContent = "PIN สองช่องไม่ตรงกัน ลองใหม่อีกครั้ง"; return; }
+      result = await staffApi.setPin(loginName, pin);
+    } else {
+      result = await staffApi.login(loginName, pin);
+    }
+    if (result.status === "ok") {
+      currentUser = { name: loginName, isAdmin: Boolean(result.is_admin) };
+      sessionPin = pin;
+      storeUser(el.rememberMe.checked);
+      el.pinInput.value = "";
+      el.pinConfirm.value = "";
+      unlockApp();
+      return;
+    }
+    el.pinInput.value = "";
+    el.pinMessage.textContent = {
+      wrong: "PIN ไม่ถูกต้อง",
+      locked: "ใส่ PIN ผิดหลายครั้ง ระบบล็อกไว้ 5 นาที ลองใหม่ภายหลังหรือแจ้งผู้ดูแล",
+      nopin: "ชื่อนี้ยังไม่ได้ตั้ง PIN กด \"เลือกชื่ออื่น\" แล้วเลือกชื่อเดิมอีกครั้ง",
+      notfound: "ไม่พบชื่อนี้ในระบบ แจ้งผู้ดูแลให้เพิ่มชื่อ"
+    }[result.status] || "เข้าสู่ระบบไม่สำเร็จ";
+  } catch (error) {
+    el.pinMessage.textContent = staffErrorText(error);
+  } finally {
+    el.pinSubmit.disabled = false;
+  }
+}
+
+function staffErrorText(error) {
+  const message = String(error?.message || error || "");
+  if (message.includes("PIN_EXISTS")) return "ชื่อนี้ตั้ง PIN ไว้แล้ว ถ้าไม่ใช่คุณตั้ง แจ้งผู้ดูแลให้รีเซ็ต";
+  if (message.includes("PIN_FORMAT")) return "PIN ต้องเป็นตัวเลข 4–6 หลัก";
+  if (message.includes("PIN_LOCKED")) return "ใส่ PIN ผิดหลายครั้ง ระบบล็อกไว้ 5 นาที";
+  if (message.includes("PIN_WRONG")) return "PIN ไม่ถูกต้อง";
+  if (message.includes("NOT_ADMIN")) return "ต้องเป็นผู้ดูแลเท่านั้น";
+  if (message.includes("CANNOT_REMOVE_ADMIN")) return "ลบรายชื่อผู้ดูแลไม่ได้";
+  if (message.includes("SWAP_PENDING_EXISTS")) return "Loc นี้มีคำขอแลกค้างอยู่แล้ว รอให้ตอบรับหรือยกเลิกก่อน";
+  if (message.includes("SWAP_NOT_YOURS")) return "Loc นี้ไม่ใช่ของคุณแล้ว ลองกดรีเฟรช";
+  if (message.includes("SWAP_NOT_THEIRS")) return "อีกฝ่ายไม่ได้เป็นผู้ได้ Loc นั้นแล้ว ลองกดรีเฟรช";
+  if (message.includes("SWAP_ALREADY_THERE")) return "คุณกับอีกฝ่ายอยู่ใน Loc เดียวกันอยู่แล้ว";
+  if (message.includes("SWAP_NOT_PENDING")) return "คำขอนี้ถูกตอบหรือยกเลิกไปแล้ว";
+  if (message.includes("SWAP_")) return "ทำรายการแลก Loc ไม่สำเร็จ ลองกดรีเฟรชแล้วทำใหม่";
+  if (/locsee_swap/i.test(message)) return "ยังไม่ได้ติดตั้งระบบแลก Loc ใน Supabase (ต้องรันไฟล์ supabase-setup-swap.sql ก่อน)";
+  if (/locsee_|function|schema cache/i.test(message)) return "ยังไม่ได้ติดตั้งระบบรายชื่อใน Supabase (ต้องรันไฟล์ supabase-setup-pin.sql ก่อน)";
+  return `เกิดข้อผิดพลาด: ${message}`;
+}
 
 function unlockApp() {
   el.loginGate.classList.add("is-unlocked");
   el.appShell.classList.remove("is-locked");
+  applyRole();
+  setTab("overview");
   loadData();
 }
 
 function logoutApp() {
   sessionStorage.removeItem(AUTH_KEY);
+  sessionStorage.removeItem(USER_KEY);
+  try { localStorage.removeItem(USER_KEY); } catch {}
+  currentUser = null;
+  sessionPin = "";
+  swapNoticeShown = false;
+  swapPickFor = null;
+  document.body.classList.remove("is-admin");
   el.passwordInput.value = "";
   el.loginMessage.textContent = "";
   el.loginGate.classList.remove("is-unlocked");
   el.appShell.classList.add("is-locked");
-  el.passwordInput.focus();
+  showLoginStep("loginForm");
+}
+
+function isAdmin() { return Boolean(currentUser?.isAdmin); }
+function myName() { return currentUser?.name || ""; }
+
+function applyRole() {
+  document.body.classList.toggle("is-admin", isAdmin());
+  if (el.mePill) {
+    el.mePill.textContent = `${isAdmin() ? "👑" : "👤"} ${myName()}`;
+    el.mePill.classList.toggle("admin", isAdmin());
+  }
 }
 
 function setTab(name) {
+  const target = [...el.tabButtons].find(button => button.dataset.tab === name);
+  if (!target || (target.hasAttribute("data-admin-only") && !isAdmin())) name = "overview";
   el.tabButtons.forEach(button => button.classList.toggle("is-active", button.dataset.tab === name));
   el.panels.forEach(panel => panel.classList.toggle("is-active", panel.dataset.panel === name));
+  if (name === "admin") renderAdmin();
 }
 
 function printYearOverview() {
@@ -410,10 +621,13 @@ async function loadData() {
       slots = slotRes.data || [];
       bookings = bookingRes.data || [];
       customHolidays = holidayRes.data || [];
+      const swapRes = await db.from("swap_requests").select("*").order("created_at", { ascending: false }).limit(300);
+      swapRequests = swapRes.error ? [] : (swapRes.data || []);
     } else {
       slots = readLocal(VAC_KEY);
       bookings = readLocal(BOOKING_KEY);
       customHolidays = readLocal(HOLIDAY_KEY);
+      swapRequests = readLocal(SWAP_LOCAL_KEY);
     }
     render();
   } catch (error) {
@@ -452,10 +666,16 @@ async function createBooking(event) {
   if (!personName) return;
   const slotId = await resolveBookingSlotId();
   if (!slotId) return;
+  if (!isAdmin() && personName !== myName()) return alert("จองได้เฉพาะในชื่อของคุณเอง");
+  if (bookings.some(item => String(item.slot_id) === String(slotId) && item.person_name === personName)) {
+    showToast(`${personName} จอง Loc นี้ไว้แล้ว`);
+    return;
+  }
   const ok = await saveBookings(slotId, [personName]);
   if (!ok) return;
-  el.bookingName.value = "";
   el.bookingStart.value = "";
+  const slot = findSlot(slotId);
+  showToast(`จอง ${slot ? slotDateLabel(slot) : "Loc"} ในชื่อ ${personName} แล้ว`);
   await loadData();
 }
 
@@ -585,6 +805,8 @@ async function drawSlot(slotId, winnerCount = 1) {
 
 async function chooseWinner(slotId, winner) {
   if (!winner) return alert("กรุณาเลือกชื่อผู้ได้ Loc");
+  const slot = findSlot(slotId);
+  logEvent(`เลือกผู้ได้ Loc ${slot ? slotDateLabel(slot) : ""} เอง → ${winner}${slot?.winner_name ? ` (เดิม: ${slot.winner_name})` : ""}`);
   await setWinner(slotId, winner);
 }
 
@@ -663,12 +885,21 @@ async function swapWinners(firstSlotId, secondSlotId) {
     writeLocal(VAC_KEY, slots);
   }
 
+  logEvent(`แลก Loc: ${firstWinner} ได้ ${slotDateLabel(secondSlot)} ⇄ ${secondWinner} ได้ ${slotDateLabel(firstSlot)}`);
   await loadData();
   alert("แลก Loc เรียบร้อยแล้ว");
 }
 
 async function deleteItem(type, id) {
   if (!confirm("ลบรายการนี้?")) return;
+  if (type === "slot") {
+    const slot = findSlot(id);
+    if (slot) logEvent(`ลบ Loc ${slotDateLabel(slot)}${slot.winner_name ? ` (ผู้ได้: ${slot.winner_name})` : ""}`);
+  } else if (type === "booking") {
+    const booking = bookings.find(item => String(item.id) === String(id));
+    const slot = booking && findSlot(booking.slot_id);
+    if (booking && slot) logEvent(`ยกเลิกการจอง Loc ${slotDateLabel(slot)} ของ ${booking.person_name}`);
+  }
   if (hasSupabase) {
     const table = type === "slot" ? "loc_slots" : type === "booking" ? "loc_bookings" : "special_holidays";
     const { error } = await db.from(table).delete().eq("id", id);
@@ -701,8 +932,11 @@ function render() {
   renderYear(slotDayMap, holidayMap, query);
   renderMonthView(0, slotDayMap, holidayMap);
   renderSearchDetails(query, filteredSlots, holidayMap);
+  renderBookingNames();
   renderOpenSlots(filteredSlots);
   renderDrawList(filteredSlots);
+  renderMine(yearSlots);
+  updateMineBadge(yearSlots);
   renderSummary(yearSlots);
   renderHolidaySummary();
   renderRecent(yearSlots);
@@ -847,14 +1081,18 @@ function selectSlotForBooking(slotId) {
 }
 
 function renderOpenSlots(items) {
-  el.openSlotList.innerHTML = items.length ? items.map(slotCard).join("") : `<div class="card slot-card">ยังไม่มี Loc ที่เปิดจองในปีนี้</div>`;
+  const list = isAdmin() ? items : items.filter(slot => slot.status !== "drawn");
+  const card = isAdmin() ? slotCard : memberSlotCard;
+  el.openSlotList.innerHTML = list.length ? list.map(card).join("") : `<div class="card slot-card">ยังไม่มี Loc ที่เปิดจองในปีนี้</div>`;
   bindSlotActions(el.openSlotList);
 }
 
 function renderDrawList(items) {
   const drawnSlots = items.filter(slot => slot.status === "drawn" && splitWinners(slot.winner_name).length);
   const swapPanel = drawnSlots.length >= 2 ? renderSwapPanel(drawnSlots) : "";
-  const cards = items.length ? items.map(slotCard).join("") : `<div class="card slot-card">ยังไม่มี Loc สำหรับจับฉลาก</div>`;
+  const order = { ready: 0, one: 1, empty: 2, done: 3 };
+  const sorted = [...items].sort((a, b) => order[slotState(a)] - order[slotState(b)] || a.start_date.localeCompare(b.start_date));
+  const cards = sorted.length ? sorted.map(slotCard).join("") : `<div class="card slot-card">ยังไม่มี Loc สำหรับจับฉลาก</div>`;
   el.drawList.innerHTML = swapPanel + cards;
   bindSwapActions(el.drawList);
   bindSlotActions(el.drawList);
@@ -867,8 +1105,8 @@ function renderSwapPanel(drawnSlots) {
   return `
     <section class="swap-panel card">
       <div>
-        <h2>แลก Loc กันเอง</h2>
-        <p>เลือก Loc ของทั้งสองฝ่าย ระบบจะสลับผู้ได้โดยไม่จับฉลากใหม่</p>
+        <h2>ผู้ดูแลสลับ Loc ให้ทันที</h2>
+        <p>ใช้กรณีพิเศษ ปกติให้แต่ละคนกด "ขอแลก" ในแท็บ Loc ของฉัน แล้วให้อีกฝ่ายยืนยันเอง</p>
       </div>
       <div class="swap-fields">
         <label>Loc ฝ่ายที่ 1
@@ -918,8 +1156,9 @@ function slotCard(slot) {
       <button class="btn small" type="button" data-save-person-leave="${slot.id}" data-person-name="${escapeHtml(name)}">บันทึก</button>
     </div>
   `).join("");
+  const state = slotState(slot);
   return `
-    <article class="slot-card">
+    <article class="slot-card${state === "ready" ? " is-ready" : ""}">
       <div class="slot-top">
         <div>
           <div class="slot-title">${escapeHtml(slotDisplayTitle(slot))}</div>
@@ -927,16 +1166,13 @@ function slotCard(slot) {
           <div class="candidate-list">${candidates}</div>
         </div>
         <div class="actions">
-          ${slotBookings.length && !winnerNames.length ? `
-            <label class="mini-field">ผู้ได้
-              <input class="input count-input" type="number" min="1" max="${slotBookings.length}" value="${Math.min(Math.max(winnerNames.length || 1, 1), slotBookings.length)}" data-winner-count="${slot.id}">
-            </label>
-            <button class="btn draw" type="button" data-draw="${slot.id}">จับฉลาก</button>
-          ` : ""}
+          ${state === "ready" ? `<button class="btn go-draw" type="button" data-go-draw="${slot.id}">🎰 ไปจับฉลาก</button>` : ""}
+          ${state === "one" ? `<button class="btn swap" type="button" data-confirm-one="${slot.id}">✓ ยืนยันให้ ${escapeHtml(slotBookings[0].person_name)}</button>` : ""}
           ${!slotBookings.length && winnerNames.length ? `<button class="btn" type="button" data-move-winner="${slot.id}">ย้ายเป็นผู้จอง</button>` : ""}
           <button class="btn danger" type="button" data-delete-slot="${slot.id}">ลบ Loc</button>
         </div>
       </div>
+      ${slotBadge(slot)}
       <div class="actual-days">
         <label class="mini-field">วันลาที่ใช้จริง
           <input class="input count-input" type="number" min="1" max="${LOCK_DAYS}" value="${slotLeaveDays(slot)}" data-leave-days="${slot.id}">
@@ -953,7 +1189,8 @@ function slotCard(slot) {
               <label class="mini-field">ผู้ได้
                 <input class="input count-input" type="number" min="1" max="${slotBookings.length}" value="${Math.min(Math.max(winnerNames.length || 1, 1), slotBookings.length)}" data-winner-count="${slot.id}">
               </label>
-              <button class="btn draw" type="button" data-draw="${slot.id}">จับฉลากใหม่</button>
+              <button class="btn draw" type="button" data-draw="${slot.id}">🎰 จับฉลากใหม่</button>
+              <button class="btn" type="button" data-clear-winner="${slot.id}">ยกเลิกผล</button>
               <select class="input compact-input" data-winner-select="${slot.id}" multiple size="${Math.min(slotBookings.length, 4)}">
                 ${winnerOptions}
               </select>
@@ -976,8 +1213,13 @@ function slotCard(slot) {
 function bindSlotActions(root) {
   root.querySelectorAll("[data-draw]").forEach(btn => btn.addEventListener("click", () => {
     const input = root.querySelector(`[data-winner-count="${CSS.escape(btn.dataset.draw)}"]`);
-    drawSlot(btn.dataset.draw, input?.value || 1);
+    openDrawOverlay(btn.dataset.draw, input?.value || 1);
   }));
+  root.querySelectorAll("[data-go-draw]").forEach(btn => btn.addEventListener("click", () => openDrawOverlay(btn.dataset.goDraw, 1)));
+  root.querySelectorAll("[data-confirm-one]").forEach(btn => btn.addEventListener("click", () => confirmSingleBooker(btn.dataset.confirmOne)));
+  root.querySelectorAll("[data-clear-winner]").forEach(btn => btn.addEventListener("click", () => cancelResult(btn.dataset.clearWinner)));
+  root.querySelectorAll("[data-book]").forEach(btn => btn.addEventListener("click", () => bookForMe(btn.dataset.book)));
+  root.querySelectorAll("[data-unbook]").forEach(btn => btn.addEventListener("click", () => deleteItem("booking", btn.dataset.unbook)));
   root.querySelectorAll("[data-save-leave]").forEach(btn => btn.addEventListener("click", () => {
     const input = root.querySelector(`[data-leave-days="${CSS.escape(btn.dataset.saveLeave)}"]`);
     updateSlotLeaveDays(btn.dataset.saveLeave, input?.value || LOCK_DAYS);
@@ -1219,3 +1461,707 @@ function formatShort(dateText) { const d = new Date(`${dateText}T00:00:00`); ret
 function candidateCount(slotId) { return bookings.filter(item => item.slot_id === slotId).length; }
 function displayNames(names) { const clean = [...new Set(names.filter(Boolean))]; return clean.length <= 2 ? clean.join(", ") : `${clean[0]}, ${clean[1]} +${clean.length - 2}`; }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[ch]); }
+
+/* =====================================================================
+   ปีงบ 2571 · รายชื่อ + PIN, Loc ของฉัน, ผู้ดูแล, จับฉลากแบบสล็อต
+   ===================================================================== */
+
+// ---------- รายชื่อ + PIN (Supabase ถ้ามี, ไม่มีก็ใช้ข้อมูลในเครื่องสำหรับทดลอง) ----------
+const staffApi = hasSupabase ? {
+  async list() { return rpc("locsee_staff_list"); },
+  async login(name, pin) { return rpc("locsee_login", { p_name: name, p_pin: pin }); },
+  async setPin(name, pin) { return rpc("locsee_set_pin", { p_name: name, p_pin: pin }); },
+  async adminList(pin) { return rpc("locsee_admin_staff", { p_admin: myName(), p_admin_pin: pin }); },
+  async resetPin(pin, target) { return rpc("locsee_admin_reset_pin", { p_admin: myName(), p_admin_pin: pin, p_target: target }); },
+  async saveStaff(pin, short, full) { return rpc("locsee_admin_save_staff", { p_admin: myName(), p_admin_pin: pin, p_short: short, p_full: full }); },
+  async removeStaff(pin, target) { return rpc("locsee_admin_remove_staff", { p_admin: myName(), p_admin_pin: pin, p_target: target }); }
+} : {
+  async list() { return localStaff().map(s => ({ short_name: s.short_name, has_pin: Boolean(s.pin) })); },
+  async login(name, pin) {
+    const s = localStaff().find(item => item.short_name === name);
+    if (!s) return { status: "notfound" };
+    if (!s.pin) return { status: "nopin" };
+    return s.pin === pin ? { status: "ok", is_admin: s.is_admin } : { status: "wrong" };
+  },
+  async setPin(name, pin) {
+    const all = localStaff(), s = all.find(item => item.short_name === name);
+    if (!s) throw new Error("NOT_FOUND");
+    if (s.pin) throw new Error("PIN_EXISTS");
+    s.pin = pin; writeLocal(STAFF_LOCAL_KEY, all); logEvent("ตั้ง PIN ครั้งแรก", name);
+    return { status: "ok", is_admin: s.is_admin };
+  },
+  async adminList(pin) { localAdminCheck(pin); return localStaff().map(s => ({ ...s, has_pin: Boolean(s.pin), is_locked: false })); },
+  async resetPin(pin, target) { localAdminCheck(pin); const all = localStaff(); const s = all.find(i => i.short_name === target); if (s) s.pin = null; writeLocal(STAFF_LOCAL_KEY, all); logEvent(`รีเซ็ต PIN ของ ${target}`); },
+  async saveStaff(pin, short, full) {
+    localAdminCheck(pin);
+    const all = localStaff(), s = all.find(i => i.short_name === short);
+    if (s) { s.full_name = full; logEvent(`แก้ไขชื่อเต็มของ ${short}`); }
+    else { all.push({ short_name: short, full_name: full, is_admin: false, pin: null }); logEvent(`เพิ่มรายชื่อ ${short}`); }
+    writeLocal(STAFF_LOCAL_KEY, all);
+  },
+  async removeStaff(pin, target) {
+    localAdminCheck(pin);
+    const all = localStaff();
+    if (all.find(i => i.short_name === target)?.is_admin) throw new Error("CANNOT_REMOVE_ADMIN");
+    writeLocal(STAFF_LOCAL_KEY, all.filter(i => i.short_name !== target)); logEvent(`ลบรายชื่อ ${target}`);
+  }
+};
+
+async function rpc(name, params) {
+  const { data, error } = await db.rpc(name, params);
+  if (error) throw error;
+  return data;
+}
+
+function localStaff() {
+  const saved = readLocal(STAFF_LOCAL_KEY);
+  if (saved.length) return saved;
+  const seeded = STAFF_SEED.map(([short_name, full_name, is_admin]) => ({ short_name, full_name, is_admin: Boolean(is_admin), pin: null }));
+  writeLocal(STAFF_LOCAL_KEY, seeded);
+  return seeded;
+}
+
+function localAdminCheck(pin) {
+  const me = localStaff().find(item => item.short_name === myName());
+  if (!me || me.pin !== pin) throw new Error("PIN_WRONG");
+  if (!me.is_admin) throw new Error("NOT_ADMIN");
+}
+
+// ---------- ประวัติ ----------
+async function logEvent(action, actor = myName()) {
+  try {
+    if (hasSupabase) {
+      await db.from("activity_log").insert({ actor, action });
+    } else {
+      const log = readLocal(LOG_LOCAL_KEY);
+      log.unshift({ id: crypto.randomUUID(), created_at: new Date().toISOString(), actor, action });
+      writeLocal(LOG_LOCAL_KEY, log.slice(0, 300));
+    }
+  } catch (error) {
+    console.warn("[LOCSee] บันทึกประวัติไม่สำเร็จ", error);
+  }
+}
+
+async function loadLog() {
+  if (!hasSupabase) return readLocal(LOG_LOCAL_KEY);
+  const { data, error } = await db.from("activity_log").select("*").order("created_at", { ascending: false }).limit(150);
+  if (error) throw error;
+  return data || [];
+}
+
+// ---------- ตัวช่วย ----------
+function findSlot(id) { return slots.find(slot => String(slot.id) === String(id)); }
+function slotBookingsOf(slot) { return bookings.filter(item => String(item.slot_id) === String(slot.id)); }
+
+function slotState(slot) {
+  if (splitWinners(slot.winner_name).length) return "done";
+  const count = slotBookingsOf(slot).length;
+  return count >= 2 ? "ready" : count === 1 ? "one" : "empty";
+}
+
+function slotBadge(slot) {
+  const state = slotState(slot);
+  const text = {
+    ready: `🎲 พร้อมจับฉลาก · ${slotBookingsOf(slot).length} คน`,
+    one: "จอง 1 คน",
+    empty: "ยังไม่มีผู้จอง",
+    done: `✓ ได้แล้ว: ${escapeHtml(splitWinners(slot.winner_name).join(", "))}`
+  }[state];
+  return `<span class="badge ${state}">${text}</span>`;
+}
+
+function nameChips(slot) {
+  const winners = splitWinners(slot.winner_name);
+  return slotBookingsOf(slot).map(item => {
+    const cls = winners.includes(item.person_name) ? " win" : item.person_name === myName() ? " me" : "";
+    return `<span class="name-chip${cls}">${escapeHtml(item.person_name)}</span>`;
+  }).join("");
+}
+
+function renderBookingNames() {
+  if (!el.bookingName) return;
+  const current = el.bookingName.value || myName();
+  const names = isAdmin()
+    ? uniqueNames([myName(), ...staffNames.map(item => item.short_name)])
+    : [myName()];
+  el.bookingName.innerHTML = names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+  el.bookingName.value = names.includes(current) ? current : myName();
+  el.bookingName.disabled = !isAdmin();
+  if (el.bookingNameHint) {
+    el.bookingNameHint.textContent = isAdmin()
+      ? "ผู้ดูแลจองแทนคนอื่นได้ เลือกชื่อจากรายการ"
+      : "ระบบใส่ชื่อจากที่เข้าสู่ระบบให้อัตโนมัติ จองแทนคนอื่นไม่ได้";
+  }
+  if (isAdmin() && !staffNames.length) {
+    staffApi.list().then(list => { staffNames = list; renderBookingNames(); }).catch(() => {});
+  }
+}
+
+function myBookingIn(slot) {
+  return slotBookingsOf(slot).find(item => item.person_name === myName());
+}
+
+function memberSlotCard(slot) {
+  const state = slotState(slot);
+  const mine = myBookingIn(slot);
+  const count = slotBookingsOf(slot).length;
+  return `
+    <article class="slot-card${state === "ready" ? " is-ready" : ""}">
+      <div class="slot-top">
+        <div>
+          <div class="slot-title">${escapeHtml(slotDateLabel(slot))}</div>
+          <div class="slot-meta">${slotLeaveDays(slot)} วันลา · ${count} คนจอง</div>
+        </div>
+        <div class="actions">
+          ${mine
+            ? `<button class="btn" type="button" data-unbook="${mine.id}">ยกเลิกการจองของฉัน</button>`
+            : `<button class="btn primary" type="button" data-book="${slot.id}">จองช่วงนี้</button>`}
+        </div>
+      </div>
+      ${slotBadge(slot)}
+      ${count ? `<div class="name-chips">${nameChips(slot)}</div>` : ""}
+      ${state === "ready" ? `<small class="hint">รอผู้ดูแลจับฉลาก</small>` : ""}
+    </article>`;
+}
+
+async function bookForMe(slotId) {
+  const slot = findSlot(slotId);
+  if (!slot || !myName()) return;
+  if (myBookingIn(slot)) return showToast("คุณจอง Loc นี้ไว้แล้ว");
+  const ok = await saveBookings(slot.id, [myName()]);
+  if (!ok) return;
+  showToast(`จอง ${slotDateLabel(slot)} ในชื่อ ${myName()} แล้ว`);
+  await loadData();
+}
+
+async function confirmSingleBooker(slotId) {
+  const slot = findSlot(slotId);
+  const only = slot && slotBookingsOf(slot)[0];
+  if (!only) return;
+  await logEvent(`ยืนยัน Loc ${slotDateLabel(slot)} → ${only.person_name} (จองคนเดียว ไม่ต้องจับฉลาก)`);
+  await setWinner(slot.id, only.person_name);
+  showToast(`บันทึกแล้ว: ${only.person_name} ได้ ${slotDateLabel(slot)}`);
+}
+
+async function cancelResult(slotId) {
+  const slot = findSlot(slotId);
+  if (!slot?.winner_name) return;
+  if (!confirm(`ยกเลิกผล Loc ${slotDateLabel(slot)} (ผู้ได้: ${slot.winner_name})?\nระบบจะเก็บผลเดิมไว้ในประวัติ`)) return;
+  await logEvent(`ยกเลิกผล Loc ${slotDateLabel(slot)} (เดิม: ${slot.winner_name})`);
+  await clearWinner(slot.id);
+  showToast("ยกเลิกผลแล้ว");
+  await loadData();
+}
+
+// ---------- Loc ของฉัน ----------
+function renderMine(yearSlots) {
+  if (!el.mineList || !currentUser) return;
+  const name = myName();
+  if (el.mineTitle) el.mineTitle.textContent = `Loc ของ ${name} · ปี ${selectedFiscalYear}`;
+  const won = yearSlots.filter(slot => splitWinners(slot.winner_name).includes(name));
+  const waiting = yearSlots.filter(slot => slot.status !== "drawn" && myBookingIn(slot));
+  const used = won.reduce((total, slot) => total + personLeaveDays(slot, name), 0);
+  const pendingDays = waiting.reduce((total, slot) => total + slotLeaveDays(slot), 0);
+  const pct = value => Math.max(0, Math.min(100, value / TOTAL_ALLOWANCE_DAYS * 100));
+  let html = `
+    <article class="slot-card meter">
+      <div class="slot-top">
+        <div class="slot-title">ใช้ไปแล้ว ${used} / ${TOTAL_ALLOWANCE_DAYS} วัน</div>
+        <span class="count-pill">เหลือ ${TOTAL_ALLOWANCE_DAYS - used} วัน</span>
+      </div>
+      <div class="meter-bar" role="img" aria-label="ใช้ ${used} จาก ${TOTAL_ALLOWANCE_DAYS} วัน">
+        <span style="width:${pct(used)}%"></span>
+        <span class="pending" style="width:${pct(Math.min(pendingDays, TOTAL_ALLOWANCE_DAYS - used))}%"></span>
+      </div>
+      <div class="meter-legend">
+        <span>■ ได้ Loc แล้ว ${won.length} ครั้ง</span>
+        <span>▨ รอจับฉลาก ${waiting.length} รายการ (${pendingDays} วัน)</span>
+      </div>
+      <small class="hint">สิทธิ์ลาพักร้อน ${VACATION_ALLOWANCE_DAYS} วัน + ของโรงพยาบาล ${HOSPITAL_ALLOWANCE_DAYS} วัน</small>
+    </article>
+    ${swapRequestCards()}
+    <h2 class="section-title">Loc ที่ได้แล้ว</h2>`;
+  html += won.length ? won.map(slot => wonSlotCard(slot, yearSlots)).join("") : `<div class="empty-note">ยังไม่ได้ Loc ในปีนี้</div>`;
+  html += swapHistory();
+  html += `<h2 class="section-title">รอจับฉลาก</h2>`;
+  html += waiting.length ? waiting.map(slot => `
+    <article class="slot-card">
+      <div class="slot-top">
+        <div>
+          <div class="slot-title">${escapeHtml(slotDateLabel(slot))}</div>
+          <div class="slot-meta">ผู้จองทั้งหมด ${slotBookingsOf(slot).length} คน</div>
+        </div>
+        <div class="actions"><button class="btn" type="button" data-unbook="${myBookingIn(slot).id}">ยกเลิกการจอง</button></div>
+      </div>
+      <div class="name-chips">${nameChips(slot)}</div>
+    </article>`).join("") : `<div class="empty-note">ไม่มี Loc ที่รอจับฉลาก · ไปที่แท็บ "จอง Loc" เพื่อจอง</div>`;
+  el.mineList.innerHTML = html;
+  bindSlotActions(el.mineList);
+}
+
+function updateMineBadge(yearSlots) {
+  const tab = [...el.tabButtons].find(button => button.dataset.tab === "mine");
+  if (!tab || !currentUser) return;
+  const waiting = yearSlots.filter(slot => slot.status !== "drawn" && myBookingIn(slot)).length;
+  const incoming = incomingSwaps().length;
+  tab.innerHTML = `Loc ของฉัน${incoming
+    ? `<span class="tab-dot alert" title="มีคำขอแลก Loc">🔔${incoming}</span>`
+    : waiting ? `<span class="tab-dot" title="รอจับฉลาก">${waiting}</span>` : ""}`;
+  if (incoming && !swapNoticeShown) {
+    swapNoticeShown = true;
+    showToast(`มีคำขอแลก Loc ${incoming} รายการ ดูที่แท็บ "Loc ของฉัน"`);
+  }
+}
+
+// ---------- ผู้ดูแล ----------
+on(el.adminUnlockForm, "submit", async event => {
+  event.preventDefault();
+  sessionPin = el.adminPinInput.value.trim();
+  el.adminPinInput.value = "";
+  await renderAdmin();
+});
+
+on(el.staffForm, "submit", async event => {
+  event.preventDefault();
+  const short = el.staffShort.value.trim();
+  if (!short) return showToast("กรุณาใส่ชื่อที่แสดง");
+  await adminAction(() => staffApi.saveStaff(sessionPin, short, el.staffFull.value.trim()), `บันทึกรายชื่อ ${short} แล้ว`);
+  el.staffShort.value = "";
+  el.staffFull.value = "";
+});
+
+on(el.staffList, "click", async event => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  const { resetPin, removeStaff, editStaff } = button.dataset;
+  if (resetPin) {
+    if (!confirm(`รีเซ็ต PIN ของ ${resetPin}?\nเจ้าตัวจะต้องตั้ง PIN ใหม่ตอนเข้าสู่ระบบครั้งถัดไป`)) return;
+    await adminAction(() => staffApi.resetPin(sessionPin, resetPin), `รีเซ็ต PIN ของ ${resetPin} แล้ว`);
+  }
+  if (removeStaff) {
+    if (!confirm(`ลบ ${removeStaff} ออกจากรายชื่อ?\nข้อมูลการจองเดิมยังอยู่ แต่จะเข้าสู่ระบบไม่ได้`)) return;
+    await adminAction(() => staffApi.removeStaff(sessionPin, removeStaff), `ลบ ${removeStaff} แล้ว`);
+  }
+  if (editStaff) {
+    el.staffShort.value = editStaff;
+    el.staffFull.value = button.dataset.full || "";
+    el.staffFull.focus();
+  }
+});
+
+async function adminAction(action, successText) {
+  try {
+    await action();
+    showToast(successText);
+    staffNames = await staffApi.list();
+  } catch (error) {
+    showToast(staffErrorText(error));
+    if (/PIN_WRONG|PIN_LOCKED/.test(String(error?.message))) sessionPin = "";
+  }
+  await renderAdmin();
+}
+
+async function renderAdmin() {
+  if (!isAdmin() || !el.staffList) return;
+  el.adminUnlockForm.hidden = Boolean(sessionPin);
+  el.staffForm.hidden = !sessionPin;
+  if (!sessionPin) {
+    el.staffList.innerHTML = `<div class="empty-note">ใส่ PIN ด้านบนเพื่อดูและจัดการรายชื่อ</div>`;
+  } else {
+    try {
+      const rows = await staffApi.adminList(sessionPin);
+      el.staffList.innerHTML = rows.map(row => `
+        <div class="staff-row">
+          <div><strong>${row.is_admin ? "👑 " : ""}${escapeHtml(row.short_name)}</strong><small>${escapeHtml(row.full_name || "—")}</small></div>
+          <span class="pin-state ${row.is_locked ? "locked" : row.has_pin ? "ok" : "no"}">${row.is_locked ? "ล็อก 5 นาที" : row.has_pin ? "ตั้ง PIN แล้ว" : "ยังไม่ตั้ง PIN"}</span>
+          <div class="actions">
+            <button class="btn small" type="button" data-edit-staff="${escapeHtml(row.short_name)}" data-full="${escapeHtml(row.full_name || "")}">แก้ชื่อ</button>
+            ${row.has_pin || row.is_locked ? `<button class="btn small" type="button" data-reset-pin="${escapeHtml(row.short_name)}">รีเซ็ต PIN</button>` : ""}
+            ${row.is_admin ? "" : `<button class="btn small danger" type="button" data-remove-staff="${escapeHtml(row.short_name)}">ลบ</button>`}
+          </div>
+        </div>`).join("");
+    } catch (error) {
+      el.staffList.innerHTML = `<div class="empty-note">${escapeHtml(staffErrorText(error))}</div>`;
+      if (/PIN_WRONG|PIN_LOCKED/.test(String(error?.message))) {
+        sessionPin = "";
+        el.adminUnlockForm.hidden = false;
+        el.staffForm.hidden = true;
+      }
+    }
+  }
+  try {
+    const log = await loadLog();
+    const fmt = new Intl.DateTimeFormat("th-TH-u-ca-buddhist", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+    el.logList.innerHTML = log.length
+      ? log.map(item => `<div class="log-item"><time>${fmt.format(new Date(item.created_at))} · ${escapeHtml(item.actor || "-")}</time>${escapeHtml(item.action)}</div>`).join("")
+      : `<div class="empty-note">ยังไม่มีประวัติ</div>`;
+  } catch (error) {
+    el.logList.innerHTML = `<div class="empty-note">โหลดประวัติไม่สำเร็จ (ต้องรันไฟล์ supabase-setup-pin.sql ก่อน)</div>`;
+  }
+}
+
+// ---------- หน้าจับฉลากเต็มจอ ----------
+const draw = { slotId: null, count: 1, spinning: false };
+const drawEl = id => document.getElementById(id);
+
+on(drawEl("drawCloseBtn"), "click", closeDrawOverlay);
+on(drawEl("drawMinus"), "click", () => { draw.count--; updateDrawStepper(); buildReels(); });
+on(drawEl("drawPlus"), "click", () => { draw.count++; updateDrawStepper(); buildReels(); });
+on(drawEl("drawSpinBtn"), "click", spinDraw);
+window.addEventListener("keydown", event => {
+  if (event.key === "Escape" && el.drawOverlay && !el.drawOverlay.hidden && !draw.spinning) closeDrawOverlay();
+});
+
+function drawCandidates() {
+  const slot = findSlot(draw.slotId);
+  return slot ? uniqueNames(slotBookingsOf(slot).map(item => item.person_name)) : [];
+}
+
+function openDrawOverlay(slotId, count = 1) {
+  if (!isAdmin()) return;
+  const slot = findSlot(slotId);
+  if (!slot) return;
+  const names = uniqueNames(slotBookingsOf(slot).map(item => item.person_name));
+  if (!names.length) return alert("ยังไม่มีคนจอง Loc นี้");
+  draw.slotId = slot.id;
+  draw.count = Math.max(1, Math.min(Number(count) || 1, names.length));
+  drawEl("drawTitle").textContent = slotDateLabel(slot);
+  drawEl("drawMeta").textContent = `${slotLeaveDays(slot)} วันลา · ผู้จอง ${names.length} คน${slot.winner_name ? ` · ผลเดิม: ${slot.winner_name}` : ""}`;
+  drawEl("drawNames").innerHTML = names.map(name => `<span class="name-chip">${escapeHtml(name)}</span>`).join("");
+  drawEl("drawSaved").hidden = true;
+  drawEl("drawNextBtn").hidden = true;
+  drawEl("drawSpinBtn").hidden = false;
+  drawEl("drawSpinBtn").disabled = false;
+  drawEl("drawMessage").textContent = "กดปุ่มด้านล่างเพื่อเริ่มสุ่ม";
+  updateDrawStepper();
+  buildReels();
+  el.drawOverlay.hidden = false;
+  el.drawOverlay.scrollTop = 0;
+  document.body.classList.add("drawing");
+  drawEl("drawSpinBtn").focus();
+}
+
+function closeDrawOverlay() {
+  if (draw.spinning) return;
+  el.drawOverlay.hidden = true;
+  document.body.classList.remove("drawing");
+  draw.slotId = null;
+}
+
+function updateDrawStepper() {
+  const total = drawCandidates().length;
+  drawEl("drawCount").textContent = draw.count;
+  drawEl("drawMinus").disabled = draw.spinning || draw.count <= 1;
+  drawEl("drawPlus").disabled = draw.spinning || draw.count >= total;
+}
+
+function buildReels() {
+  drawEl("drawReels").innerHTML = Array.from({ length: draw.count }, () =>
+    `<div class="reel"><div class="reel-strip"><div>?</div></div></div>`).join("");
+}
+
+function spinDraw() {
+  if (draw.spinning) return;
+  const names = drawCandidates();
+  if (!names.length) return;
+  draw.spinning = true;
+  updateDrawStepper();
+  drawEl("drawSpinBtn").disabled = true;
+  drawEl("drawMessage").textContent = "กำลังสุ่ม…";
+  const pool = [...names];
+  const random = max => {
+    if (window.crypto?.getRandomValues) { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % max; }
+    return Math.floor(Math.random() * max);
+  };
+  for (let i = pool.length - 1; i > 0; i--) { const j = random(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  const picked = pool.slice(0, draw.count);
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const reels = [...document.querySelectorAll("#drawReels .reel")];
+  let finished = 0;
+  reels.forEach((reel, index) => {
+    const strip = reel.querySelector(".reel-strip");
+    const sequence = [];
+    const loops = reduce ? 1 : 16 + index * 6;
+    for (let k = 0; k < loops; k++) sequence.push(names[(k + index) % names.length]);
+    sequence.push(picked[index]);
+    strip.innerHTML = sequence.map(name => `<div>${escapeHtml(name)}</div>`).join("");
+    strip.style.transition = "none";
+    strip.style.transform = "translateY(0)";
+    void strip.offsetHeight;
+    const duration = reduce ? 150 : 2800 + index * 800;
+    const rowHeight = strip.firstElementChild.offsetHeight || 76;
+    strip.style.transition = `transform ${duration}ms cubic-bezier(.12,.75,.18,1)`;
+    strip.style.transform = `translateY(-${(sequence.length - 1) * rowHeight}px)`;
+    setTimeout(() => {
+      reel.classList.add("win");
+      if (++finished === reels.length) finishDraw(picked, names.length);
+    }, duration + 60);
+  });
+}
+
+async function finishDraw(picked, total) {
+  const slot = findSlot(draw.slotId);
+  const winners = joinWinners(picked);
+  drawEl("drawMessage").textContent = "กำลังบันทึกผล…";
+  await logEvent(`จับฉลาก Loc ${slotDateLabel(slot)} → ${winners} (จากผู้จอง ${total} คน)${slot.winner_name ? ` · ผลเดิม: ${slot.winner_name}` : ""}`);
+  await setWinner(slot.id, winners);
+  draw.spinning = false;
+  updateDrawStepper();
+  drawEl("drawMessage").textContent = "ได้ผลแล้ว!";
+  drawEl("drawSpinBtn").hidden = true;
+  drawEl("drawWinners").textContent = winners;
+  drawEl("drawSaved").hidden = false;
+  const yearSlots = slots.filter(item => overlapsFiscalYear(item.start_date, item.end_date));
+  const next = yearSlots.filter(item => slotState(item) === "ready").sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
+  const nextBtn = drawEl("drawNextBtn");
+  nextBtn.hidden = false;
+  nextBtn.textContent = next ? `จับฉลาก Loc ถัดไป (${slotDateLabel(next)}) →` : "จับครบทุก Loc แล้ว · กลับหน้าจับฉลาก";
+  nextBtn.onclick = () => next ? openDrawOverlay(next.id, 1) : closeDrawOverlay();
+  launchConfetti();
+}
+
+// ---------- แจ้งเตือนสั้น + คอนเฟตตี ----------
+let toastTimer;
+function showToast(message) {
+  if (!el.toast) return;
+  el.toast.textContent = message;
+  el.toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.toast.hidden = true; }, 2800);
+}
+
+function launchConfetti() {
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  const canvas = document.getElementById("confetti");
+  const ctx = canvas?.getContext("2d");
+  if (!ctx) return;
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+  const style = getComputedStyle(document.body);
+  const colors = ["--yellow", "--green", "--blue", "--pink", "--cream"].map(name => style.getPropertyValue(name).trim() || "#ead989");
+  const bits = Array.from({ length: 130 }, () => ({
+    x: canvas.width / 2, y: canvas.height * 0.4,
+    vx: (Math.random() - 0.5) * 15, vy: -Math.random() * 15 - 4,
+    s: 7 + Math.random() * 6, r: Math.random() * 6,
+    c: colors[Math.floor(Math.random() * colors.length)]
+  }));
+  let frame = 0;
+  (function tick() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    bits.forEach(b => {
+      b.vy += 0.42; b.x += b.vx; b.y += b.vy; b.r += 0.12;
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r);
+      ctx.fillStyle = b.c; ctx.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2);
+      ctx.strokeStyle = "#2f3542"; ctx.lineWidth = 1; ctx.strokeRect(-b.s / 2, -b.s / 4, b.s, b.s / 2);
+      ctx.restore();
+    });
+    if (++frame < 120) requestAnimationFrame(tick);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  })();
+}
+
+/* =====================================================================
+   รอบที่ 2 · ขอแลก Loc แบบยืนยันสองฝ่าย
+   ===================================================================== */
+let swapNoticeShown = false;
+
+const swapApi = hasSupabase ? {
+  request(pin, mySlot, targetSlot, targetName) {
+    return rpc("locsee_swap_request", { p_name: myName(), p_pin: pin, p_my_slot: String(mySlot), p_target_slot: String(targetSlot), p_target_name: targetName });
+  },
+  respond(pin, requestId, accept) {
+    return rpc("locsee_swap_respond", { p_name: myName(), p_pin: pin, p_request_id: Number(requestId), p_accept: accept });
+  },
+  cancel(pin, requestId) {
+    return rpc("locsee_swap_cancel", { p_name: myName(), p_pin: pin, p_request_id: Number(requestId) });
+  }
+} : {
+  // โหมดทดลองในเครื่อง ทำงานแบบเดียวกับฟังก์ชันใน Supabase
+  async request(pin, mySlot, targetSlot, targetName) {
+    await localPinCheck(pin);
+    const all = readLocal(SWAP_LOCAL_KEY);
+    const busy = all.some(r => r.status === "pending" && [[r.from_name, r.from_slot_id], [r.to_name, r.to_slot_id]]
+      .some(([n, sl]) => (n === myName() && sl === String(mySlot)) || (n === targetName && sl === String(targetSlot))));
+    if (busy) throw new Error("SWAP_PENDING_EXISTS");
+    all.unshift({ id: Date.now(), created_at: new Date().toISOString(), from_name: myName(), from_slot_id: String(mySlot), to_name: targetName, to_slot_id: String(targetSlot), status: "pending" });
+    writeLocal(SWAP_LOCAL_KEY, all);
+    logEvent(`ขอแลก Loc ${slotDateLabel(findSlot(mySlot))} กับ ${targetName} (${slotDateLabel(findSlot(targetSlot))}) · รอตอบรับ`);
+  },
+  async respond(pin, requestId, accept) {
+    await localPinCheck(pin);
+    const all = readLocal(SWAP_LOCAL_KEY);
+    const r = all.find(item => String(item.id) === String(requestId));
+    if (!r || r.status !== "pending") throw new Error("SWAP_NOT_PENDING");
+    r.resolved_at = new Date().toISOString();
+    if (!accept) { r.status = "rejected"; writeLocal(SWAP_LOCAL_KEY, all); logEvent(`ปฏิเสธคำขอแลก Loc จาก ${r.from_name}`); return "rejected"; }
+    const a = findSlot(r.from_slot_id), b = findSlot(r.to_slot_id);
+    const an = splitWinners(a?.winner_name), bn = splitWinners(b?.winner_name);
+    if (!a || !b || !an.includes(r.from_name) || !bn.includes(r.to_name)) { r.status = "expired"; writeLocal(SWAP_LOCAL_KEY, all); return "expired"; }
+    a.winner_name = an.map(n => n === r.from_name ? r.to_name : n).join(", ");
+    b.winner_name = bn.map(n => n === r.to_name ? r.from_name : n).join(", ");
+    writeLocal(VAC_KEY, slots);
+    r.status = "accepted";
+    all.forEach(o => { if (o !== r && o.status === "pending" && [o.from_slot_id, o.to_slot_id].some(id => id === r.from_slot_id || id === r.to_slot_id)) { o.status = "expired"; } });
+    writeLocal(SWAP_LOCAL_KEY, all);
+    logEvent(`แลก Loc สำเร็จ: ${r.from_name} ได้ ${slotDateLabel(b)} ⇄ ${r.to_name} ได้ ${slotDateLabel(a)}`);
+    return "accepted";
+  },
+  async cancel(pin, requestId) {
+    await localPinCheck(pin);
+    const all = readLocal(SWAP_LOCAL_KEY);
+    const r = all.find(item => String(item.id) === String(requestId));
+    if (!r || r.status !== "pending") throw new Error("SWAP_NOT_PENDING");
+    r.status = "cancelled"; r.resolved_at = new Date().toISOString();
+    writeLocal(SWAP_LOCAL_KEY, all);
+    logEvent(`ยกเลิกคำขอแลก Loc กับ ${r.to_name}`);
+  }
+};
+
+async function localPinCheck(pin) {
+  const result = await staffApi.login(myName(), pin);
+  if (result.status !== "ok") throw new Error(result.status === "locked" ? "PIN_LOCKED" : "PIN_WRONG");
+}
+
+function incomingSwaps() { return swapRequests.filter(r => r.status === "pending" && r.to_name === myName()); }
+function outgoingSwaps() { return swapRequests.filter(r => r.status === "pending" && r.from_name === myName()); }
+function slotHasPendingSwap(slot, name) {
+  return swapRequests.some(r => r.status === "pending" &&
+    ((r.from_name === name && String(r.from_slot_id) === String(slot.id)) || (r.to_name === name && String(r.to_slot_id) === String(slot.id))));
+}
+function swapSlotLabel(id) { const slot = findSlot(id); return slot ? slotDateLabel(slot) : "Loc ที่ถูกลบไปแล้ว"; }
+
+function pinField(id, label = "PIN ของคุณ") {
+  return `<input class="input swap-pin" id="${id}" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="${label}" aria-label="${label}">`;
+}
+
+function swapRequestCards() {
+  const incoming = incomingSwaps().map(r => `
+    <article class="slot-card swap-req">
+      <div class="slot-title">🔔 ${escapeHtml(r.from_name)} ขอแลก Loc กับคุณ</div>
+      <div class="swap-line">
+        <div class="swap-side"><small>คุณจะได้</small><strong>${escapeHtml(swapSlotLabel(r.from_slot_id))}</strong></div>
+        <span class="swap-arrow" aria-hidden="true">⇄</span>
+        <div class="swap-side"><small>${escapeHtml(r.from_name)} จะได้ (ของคุณตอนนี้)</small><strong>${escapeHtml(swapSlotLabel(r.to_slot_id))}</strong></div>
+      </div>
+      <div class="swap-actions">
+        ${pinField(`swap-pin-${r.id}`)}
+        <button class="btn swap" type="button" data-swap-accept="${r.id}">ยอมรับแลก</button>
+        <button class="btn ghost" type="button" data-swap-reject="${r.id}">ปฏิเสธ</button>
+      </div>
+    </article>`).join("");
+  const outgoing = outgoingSwaps().map(r => `
+    <article class="slot-card swap-req out">
+      <div class="slot-title">⏳ รอ ${escapeHtml(r.to_name)} ตอบรับ</div>
+      <div class="slot-meta">ของคุณ ${escapeHtml(swapSlotLabel(r.from_slot_id))} ⇄ ของ ${escapeHtml(r.to_name)} ${escapeHtml(swapSlotLabel(r.to_slot_id))}</div>
+      <div class="swap-actions">
+        ${pinField(`swap-pin-${r.id}`)}
+        <button class="btn ghost" type="button" data-swap-cancel="${r.id}">ยกเลิกคำขอ</button>
+      </div>
+    </article>`).join("");
+  return incoming || outgoing ? `<h2 class="section-title">คำขอแลก Loc</h2>${incoming}${outgoing}` : "";
+}
+
+function wonSlotCard(slot, yearSlots) {
+  const name = myName();
+  const busy = slotHasPendingSwap(slot, name);
+  const targets = [];
+  yearSlots.forEach(other => {
+    if (String(other.id) === String(slot.id)) return;
+    const winners = splitWinners(other.winner_name);
+    if (!winners.length || winners.includes(name)) return;
+    winners.forEach(person => {
+      if (splitWinners(slot.winner_name).includes(person) || slotHasPendingSwap(other, person)) return;
+      targets.push({ slot: other, person });
+    });
+  });
+  targets.sort((a, b) => a.slot.start_date.localeCompare(b.slot.start_date));
+  const picking = String(swapPickFor) === String(slot.id);
+  return `
+    <article class="slot-card">
+      <div class="slot-top">
+        <div>
+          <div class="slot-title">${escapeHtml(slotDateLabel(slot))}</div>
+          <div class="slot-meta">ใช้ ${personLeaveDays(slot, name)} วันลา</div>
+        </div>
+        <div class="actions">
+          ${busy ? `<span class="badge one">มีคำขอแลกค้างอยู่</span>`
+            : picking ? "" : `<button class="btn swap" type="button" data-swap-pick="${slot.id}" ${targets.length ? "" : "disabled"}>⇄ ขอแลก</button>`}
+        </div>
+      </div>
+      ${picking ? `
+        <div class="swap-pick">
+          <label for="swap-target-${slot.id}">อยากแลกกับ Loc ของใคร</label>
+          <select class="input" id="swap-target-${slot.id}">
+            ${targets.map(t => `<option value="${escapeHtml(String(t.slot.id))}|${escapeHtml(t.person)}">${escapeHtml(t.person)} · ${escapeHtml(slotDateLabel(t.slot))}</option>`).join("")}
+          </select>
+          <div class="swap-actions">
+            ${pinField(`swap-pin-new-${slot.id}`, "PIN ยืนยันการขอ")}
+            <button class="btn primary" type="button" data-swap-send="${slot.id}">ส่งคำขอแลก</button>
+            <button class="btn ghost" type="button" data-swap-pick="">ยกเลิก</button>
+          </div>
+          <small class="hint">อีกฝ่ายต้องเข้ามาใส่ PIN กดยอมรับก่อน ระบบถึงจะสลับให้</small>
+        </div>` : ""}
+    </article>`;
+}
+
+function swapHistory() {
+  const name = myName();
+  const done = swapRequests.filter(r => r.status !== "pending" && (r.from_name === name || r.to_name === name)).slice(0, 5);
+  if (!done.length) return "";
+  const word = { accepted: "✓ แลกสำเร็จ", rejected: "✕ ถูกปฏิเสธ", cancelled: "ยกเลิกแล้ว", expired: "หมดอายุ (ผลจับฉลากเปลี่ยน)" };
+  return `<h2 class="section-title">ประวัติการขอแลกล่าสุด</h2>` + done.map(r => `
+    <div class="log-item"><time>${escapeHtml(word[r.status] || r.status)}</time>
+      ${escapeHtml(r.from_name)} (${escapeHtml(swapSlotLabel(r.from_slot_id))}) ⇄ ${escapeHtml(r.to_name)} (${escapeHtml(swapSlotLabel(r.to_slot_id))})</div>`).join("");
+}
+
+on(el.mineList, "click", async event => {
+  const button = event.target.closest("button");
+  if (!button || button.disabled) return;
+  const d = button.dataset;
+  if (d.swapPick !== undefined) {
+    swapPickFor = d.swapPick || null;
+    render();
+    if (swapPickFor) document.getElementById(`swap-target-${swapPickFor}`)?.focus();
+    return;
+  }
+  const readPin = id => {
+    const input = document.getElementById(id);
+    const pin = input?.value.trim() || "";
+    if (!pin) { showToast("ใส่ PIN ของคุณก่อน"); input?.focus(); }
+    return pin;
+  };
+  const run = async (work, success) => {
+    button.disabled = true;
+    try {
+      const result = await work();
+      if (result === "expired") showToast("คำขอนี้ใช้ไม่ได้แล้ว เพราะผลจับฉลากเปลี่ยนไป");
+      else { showToast(success); if (result === "accepted") launchConfetti(); }
+      swapPickFor = null;
+      await loadData();
+    } catch (error) {
+      showToast(staffErrorText(error));
+      button.disabled = false;
+    }
+  };
+  if (d.swapSend) {
+    const pin = readPin(`swap-pin-new-${d.swapSend}`); if (!pin) return;
+    const [targetSlot, targetName] = (document.getElementById(`swap-target-${d.swapSend}`)?.value || "").split("|");
+    if (!targetSlot || !targetName) return showToast("เลือก Loc ที่อยากแลกก่อน");
+    await run(() => swapApi.request(pin, d.swapSend, targetSlot, targetName), `ส่งคำขอแล้ว รอ ${targetName} ตอบรับ`);
+  }
+  if (d.swapAccept) {
+    const pin = readPin(`swap-pin-${d.swapAccept}`); if (!pin) return;
+    await run(() => swapApi.respond(pin, d.swapAccept, true), "แลก Loc สำเร็จแล้ว!");
+  }
+  if (d.swapReject) {
+    const pin = readPin(`swap-pin-${d.swapReject}`); if (!pin) return;
+    await run(() => swapApi.respond(pin, d.swapReject, false), "ปฏิเสธคำขอแล้ว");
+  }
+  if (d.swapCancel) {
+    const pin = readPin(`swap-pin-${d.swapCancel}`); if (!pin) return;
+    await run(() => swapApi.cancel(pin, d.swapCancel), "ยกเลิกคำขอแล้ว");
+  }
+});
+
+// เริ่มทำงานหลังประกาศทุกอย่างครบแล้ว
+restoreSession();
