@@ -4,18 +4,42 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LOCSee Booking</title>
-  <link rel="stylesheet" href="./styles.css?v=4">
+  <link rel="stylesheet" href="./styles.css?v=6">
 </head>
 <body>
   <section class="login-gate" id="loginGate">
-    <form class="login-card card" id="loginForm">
+    <div class="login-card card">
       <img class="login-logo" src="./assets/locsee-logo.png" alt="LOCSee">
-      <h1>เข้าสู่ LOCSee</h1>
-      <p>ใส่รหัสของวอร์ดเพื่อเปิดระบบจอง Loc Vacation</p>
-      <input class="input" id="passwordInput" type="password" placeholder="รหัสผ่าน">
-      <button class="btn primary" type="submit">เข้าสู่ระบบ</button>
-      <small id="loginMessage"></small>
-    </form>
+
+      <form class="login-step" id="loginForm">
+        <h1>เข้าสู่ LOCSee</h1>
+        <p>ใส่รหัสของวอร์ดเพื่อเปิดระบบจอง Loc Vacation</p>
+        <input class="input" id="passwordInput" type="password" placeholder="รหัสผ่าน" autocomplete="current-password">
+        <button class="btn primary" type="submit">ถัดไป</button>
+        <small class="login-msg" id="loginMessage"></small>
+      </form>
+
+      <form class="login-step" id="nameForm" hidden>
+        <h1>คุณคือใคร?</h1>
+        <p>เลือกชื่อของคุณ</p>
+        <select class="input" id="nameSelect" aria-label="เลือกชื่อ"></select>
+        <button class="btn primary" type="submit">ถัดไป</button>
+        <small class="login-msg" id="nameMessage"></small>
+        <button class="linkish" type="button" data-login-back="loginForm">← ย้อนกลับ</button>
+      </form>
+
+      <form class="login-step" id="pinForm" hidden>
+        <h1 id="pinTitle"></h1>
+        <p id="pinHint"></p>
+        <input class="input pin-input" id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="••••" aria-label="PIN">
+        <input class="input pin-input" id="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="ใส่ PIN อีกครั้ง" aria-label="ยืนยัน PIN" hidden>
+        <label class="remember"><input type="checkbox" id="rememberMe"> จำฉันไว้ในเครื่องนี้ (อย่าเลือกถ้าเป็นเครื่องส่วนกลาง)</label>
+        <button class="btn primary" type="submit" id="pinSubmit">เข้าสู่ระบบ</button>
+        <small class="login-msg" id="pinMessage"></small>
+        <button class="linkish" type="button" id="forgotPinBtn">ลืม PIN?</button>
+        <button class="linkish" type="button" data-login-back="nameForm">← เลือกชื่ออื่น</button>
+      </form>
+    </div>
   </section>
 
   <main class="app is-locked" id="appShell">
@@ -23,14 +47,19 @@
     <header class="hero card">
       <img class="brand-logo" src="./assets/locsee-logo.png" alt="LOCSee">
       <p class="status" id="statusText">กำลังโหลดข้อมูล...</p>
-      <button class="btn small ghost" id="logoutBtn" type="button">ออกจากระบบ</button>
+      <div class="whoami">
+        <span class="me-pill" id="mePill"></span>
+        <button class="btn small ghost" id="logoutBtn" type="button">ออกจากระบบ</button>
+      </div>
     </header>
 
     <nav class="tabs card">
       <button class="tab is-active" type="button" data-tab="overview">ภาพรวมทั้งปี</button>
       <button class="tab" type="button" data-tab="booking">จอง Loc</button>
-      <button class="tab" type="button" data-tab="draw">จับฉลาก/จัดการ</button>
+      <button class="tab" type="button" data-tab="mine">Loc ของฉัน</button>
+      <button class="tab" type="button" data-tab="draw" data-admin-only>จับฉลาก/จัดการ</button>
       <button class="tab" type="button" data-tab="summary">สรุป</button>
+      <button class="tab" type="button" data-tab="admin" data-admin-only>ผู้ดูแล</button>
     </nav>
 
     <section class="toolbar">
@@ -69,7 +98,7 @@
 
     <section class="panel" data-panel="booking">
       <div class="grid two">
-        <form class="card form" id="slotForm">
+        <form class="card form" id="slotForm" data-admin-only>
           <h2>สร้าง Loc ใหม่</h2>
           <label>วันเริ่ม Loc</label>
           <input class="input" id="slotStart" type="date" required>
@@ -90,8 +119,9 @@
           <label>จำนวนวันลา ถ้าสร้าง Loc ใหม่</label>
           <input class="input" id="bookingLeaveDays" type="number" min="1" max="5" value="5">
           <p class="hint">เลือกวันจันทร์ที่ต้องการจอง ระบบจะนับเป็นช่วงจันทร์-ศุกร์ให้อัตโนมัติ</p>
-          <label>ชื่อผู้จอง</label>
-          <input class="input" id="bookingName" placeholder="เช่น พี่แป้ง" required>
+          <label for="bookingName">ชื่อผู้จอง</label>
+          <select class="input" id="bookingName"></select>
+          <p class="hint" id="bookingNameHint">ระบบใส่ชื่อจากที่เข้าสู่ระบบให้อัตโนมัติ</p>
           <button class="btn primary" type="submit">ลงชื่อจอง</button>
         </form>
       </div>
@@ -100,10 +130,18 @@
       <div class="slot-list" id="openSlotList"></div>
     </section>
 
+    <section class="panel" data-panel="mine">
+      <div class="section-head">
+        <h2 id="mineTitle">Loc ของฉัน</h2>
+        <p>นับเฉพาะปีงบประมาณที่เลือกอยู่ด้านบน</p>
+      </div>
+      <div class="slot-list" id="mineList"></div>
+    </section>
+
     <section class="panel" data-panel="draw">
       <div class="section-head">
         <h2>จับฉลากหน้างาน</h2>
-        <p>Loc หนึ่งสามารถมีคนจองหลายคน กดจับฉลากเพื่อเลือกผู้ได้ Loc</p>
+        <p>Loc ที่พร้อมจับฉลากขึ้นก่อนเสมอ · กด "ไปจับฉลาก" เพื่อเปิดหน้าสุ่มเต็มจอ ผลบันทึกทันทีที่วงล้อหยุด</p>
       </div>
       <div class="slot-list" id="drawList"></div>
     </section>
@@ -114,7 +152,7 @@
           <h2>สรุปผู้ได้ Loc</h2>
           <div class="person-list" id="winnerSummary"></div>
         </article>
-        <form class="card form" id="holidayForm">
+        <form class="card form" id="holidayForm" data-admin-only>
           <h2>วันหยุดพิเศษ</h2>
           <label>ชื่อวันหยุด</label>
           <input class="input" id="holidayName" placeholder="เช่น วันจักรี">
@@ -128,8 +166,70 @@
       <div class="slot-list" id="recentList"></div>
     </section>
 
+    <section class="panel" data-panel="admin">
+      <div class="grid two">
+        <article class="card form">
+          <h2>รายชื่อพยาบาลและ PIN</h2>
+          <p class="hint">PIN ทุกคนเก็บแบบเข้ารหัส ผู้ดูแลก็มองไม่เห็น ทำได้แค่รีเซ็ตให้เจ้าตัวตั้งใหม่</p>
+          <form class="admin-unlock" id="adminUnlockForm" hidden>
+            <label for="adminPinInput">ใส่ PIN ของคุณอีกครั้งเพื่อจัดการรายชื่อ</label>
+            <div class="add-row">
+              <input class="input" id="adminPinInput" type="password" inputmode="numeric" maxlength="6" autocomplete="off">
+              <button class="btn primary" type="submit">ปลดล็อก</button>
+            </div>
+          </form>
+          <div class="slot-list" id="staffList"></div>
+          <form class="staff-form" id="staffForm">
+            <label for="staffShort">เพิ่มหรือแก้ไขรายชื่อ</label>
+            <input class="input" id="staffShort" placeholder="ชื่อที่แสดง เช่น พรชิตา">
+            <input class="input" id="staffFull" placeholder="ชื่อ-นามสกุลเต็ม">
+            <button class="btn primary" type="submit">บันทึกรายชื่อ</button>
+          </form>
+        </article>
+        <article class="card form">
+          <h2>ประวัติการเปลี่ยนแปลง</h2>
+          <p class="hint">จับฉลาก ยกเลิกผล แลก Loc ลบ Loc และรีเซ็ต PIN เก็บไว้ที่นี่ทุกครั้ง</p>
+          <div class="log-list" id="logList"></div>
+        </article>
+      </div>
+    </section>
+
     <p class="note" id="note"></p>
   </main>
+
+  <div class="draw-overlay" id="drawOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="drawTitle">
+    <div class="draw-inner">
+      <button class="btn ghost" type="button" id="drawCloseBtn">← กลับหน้าจับฉลาก</button>
+      <div class="card draw-card">
+        <small class="hint">จับฉลาก Loc</small>
+        <h2 id="drawTitle"></h2>
+        <div class="slot-meta" id="drawMeta"></div>
+        <div class="name-chips" id="drawNames"></div>
+        <div class="draw-count">
+          <strong>จำนวนผู้ได้ Loc</strong>
+          <div class="stepper">
+            <button type="button" id="drawMinus" aria-label="ลดจำนวน">−</button>
+            <output id="drawCount">1</output>
+            <button type="button" id="drawPlus" aria-label="เพิ่มจำนวน">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="machine">
+        <div class="reels" id="drawReels"></div>
+        <div class="machine-msg" id="drawMessage">กดปุ่มด้านล่างเพื่อเริ่มสุ่ม</div>
+        <button class="btn draw spin-btn" type="button" id="drawSpinBtn">🎰 สุ่มเลย!</button>
+      </div>
+      <div class="card draw-card draw-saved" id="drawSaved" hidden>
+        <small>✓ บันทึกผลแล้ว</small>
+        <strong id="drawWinners"></strong>
+        <small>ถ้าต้องการแก้ ไปที่การ์ด Loc → "แก้ผล / จับใหม่" ระบบเก็บประวัติไว้ทุกครั้ง</small>
+      </div>
+      <button class="btn primary" type="button" id="drawNextBtn" hidden></button>
+    </div>
+  </div>
+
+  <canvas id="confetti" aria-hidden="true"></canvas>
+  <div class="toast" id="toast" role="status" hidden></div>
 
   <div class="print-picker" id="printPicker" hidden>
     <div class="print-picker-card card" role="dialog" aria-modal="true" aria-labelledby="printPickerTitle">
@@ -153,6 +253,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js"></script>
-  <script src="./app.js?v=4"></script>
+  <script src="./app.js?v=6"></script>
 </body>
 </html>
